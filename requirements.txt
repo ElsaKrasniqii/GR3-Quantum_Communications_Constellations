@@ -1,0 +1,8 @@
+numpy
+scipy
+matplotlib
+seaborn
+networkx
+sgp4
+pykep
+tqdm
