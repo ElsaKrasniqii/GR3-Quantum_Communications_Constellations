@@ -1,7 +1,7 @@
 #  Quantum Communications Constellations – Genetic Algorithm 
 
 
-##  Autore
+##  Authors
 **Elsa Krasniqi**  
 
 **Elona Kuqi** 
@@ -10,7 +10,7 @@
 
 **Florjete Kuka** 
 
-Fakulteti i Inxhinierisë Elektrike dhe Kompjuterike – FIEK  
-Inxhineri Kompjuterike dhe Softuerike
-Lënda: **Dizajni i Algoritmeve**  
-Viti: 2025 
+- Faculty of Electrical and Computer Engineering
+- Computer and Software Engineering
+- Subject: **Design and Analysis of Algorithms**
+- Year: 2025 
