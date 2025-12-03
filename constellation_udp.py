@@ -47,3 +47,45 @@ def get_mothership_satellites():
     ]
     return [Satrec.twoline2rv(t[0], t[1]) for t in mothership_tles]
 
+
+###############################################################
+#  CLASS: CONSTELLATION UDP
+###############################################################
+class constellation_udp:
+
+    def __init__(self):
+        self._t0 = 10000
+        self.n_epochs = 11
+        self._duration = 10
+
+        jd0, fr = pk.epoch(self._t0, 'mjd2000').jd, 0.0
+        self.jds = np.linspace(jd0, jd0 + self._duration * 365.25, self.n_epochs)
+        self.frs = np.zeros_like(self.jds)  # Fixed: all fractional parts to 0
+        self.ep_ref = pk.epoch_from_iso_string("19491231T000000")
+
+        # MOTHERSHIPS
+        motherships = get_mothership_satellites()
+        self.pos_m = self.construct_mothership_pos(SatrecArray(motherships))
+        self.n_motherships = len(motherships)
+
+        # ROVERS
+        rover_path = "./data/spoc2/constellations/rovers.txt"
+        if not os.path.exists(rover_path):
+            raise FileNotFoundError(f"Rover file not found: {rover_path}")
+        
+        self.rovers_db = np.loadtxt(rover_path)
+        if len(self.rovers_db.shape) < 2 or self.rovers_db.shape[1] < 2:
+            raise ValueError("Rovers file must have at least 2 columns")
+        
+        self.lambdas = self.rovers_db[:, 0]
+        self.phis = self.rovers_db[:, 1]
+        self.n_rovers = 4
+        self._min_rover_dist = 3000
+
+        # CONSTANTS
+        self.LOS = 1.05 * pk.EARTH_RADIUS / 1000
+        self.R_p = pk.EARTH_RADIUS / 1000
+        self.w_p = 7.29e-5
+        self.eps_z = np.cos(np.pi / 3)
+        self._min_sat_dist = 50
+
