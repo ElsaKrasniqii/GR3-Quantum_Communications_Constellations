@@ -69,6 +69,50 @@ def setup_argument_parser():
     parser.add_argument('command', nargs='?', default='interactive',
                         choices=['optimize', 'example', 'test', 'analyze', 'interactive'])
     return parser
+def run_full_optimization(args):
+    print("\n" + "="*70)
+    print("STARTING FULL OPTIMIZATION")
+    print("="*70)
+
+    start_time = time.time()
+
+    try:
+        optimizer = QuantumCommunicationsOptimizer(
+            population_size=args.population,
+            generations=args.generations,
+            use_multithreading=args.parallel,
+            random_seed=args.seed
+        )
+
+        print(f"Optimization parameters:")
+        print(f"  Population size: {args.population}")
+        print(f"  Generations: {args.generations}")
+
+        print("\nStarting optimization...")
+        solutions = optimizer.optimize(verbose=True)
+
+        if solutions:
+            elapsed = time.time() - start_time
+            print(f"\nOptimization completed in {elapsed:.1f} seconds")
+
+            optimizer.analyze_solutions(show_top=10)
+
+            if not args.batch and args.plot:
+                optimizer.plot_pareto_front()
+                optimizer.plot_optimization_history()
+
+            optimizer.create_submission(args.output, top_n=args.top_solutions)
+
+            return optimizer
+        else:
+            print("\nNo solutions found during optimization.")
+            return None
+
+    except Exception as e:
+        print(f"\nOptimization failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
 
 def main():
     parser = setup_argument_parser()
