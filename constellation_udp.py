@@ -112,3 +112,41 @@ class constellation_udp:
 
         return pos
 
+
+    ###############################################################
+    #   GENERATE WALKER CONSTELLATIONS
+    ###############################################################
+    def generate_walker(self, S, P, F, a, e, incl, w, t0):
+        sats = []
+        # a is in km, convert to Earth radii for SGP4
+        a_earth_radii = a / (pk.EARTH_RADIUS / 1000)
+        mm = np.sqrt(pk.MU_EARTH / (a_earth_radii * pk.EARTH_RADIUS)**3) * 60  # rad/min
+
+        for i in range(P):
+            for j in range(S):
+                sat = Satrec()
+                # Convert angles to degrees for SGP4
+                incl_deg = np.degrees(incl)
+                w_deg = np.degrees(w)
+                raan = np.degrees(2 * np.pi / P * i)
+                m = np.degrees(2*np.pi/P/S * F * i + 2*np.pi/S * j)
+                
+                sat.sgp4init(
+                    WGS72,           # gravity model
+                    'i',             # 'a' = afspc mode, 'i' = improved mode
+                    j + i*S,         # satnum: Satellite number
+                    t0,              # epoch: days since 1949-12-31 00:00 UT
+                    0.0,             # bstar: drag coefficient
+                    0.0,             # ndot: ballistic coefficient
+                    0.0,             # nddot: second derivative of mean motion
+                    e,               # eccentricity
+                    w_deg,           # argpo: argument of perigee (degrees)
+                    incl_deg,        # inclo: inclination (degrees)
+                    m,               # mo: mean anomaly (degrees)
+                    mm,              # no_kozai: mean motion (rad/min)
+                    raan             # nodeo: RA of ascending node (degrees)
+                )
+                sats.append(sat)
+
+        return SatrecArray(sats)
+
