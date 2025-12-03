@@ -378,3 +378,122 @@ class QuantumCommunicationsOptimizer:
            f2_infeas = [s['fitness'][1] for s in infeasible]
            plt.scatter(f1_infeas, f2_infeas, c='red', s=20,
                       label='Infeasible', alpha=0.5, marker='x')
+
+
+ # Reference point
+       ref_point = [1.2, 1.4]
+       plt.scatter(ref_point[0], ref_point[1], c='blue', s=100,
+                  marker='*', label='Reference point', edgecolors='black')
+      
+       plt.xlabel('J1 - Average Communication Cost (normalized)', fontsize=12)
+       plt.ylabel('J2 - Infrastructure Cost (normalized)', fontsize=12)
+       plt.title('Pareto Front - Quantum Communications Constellations', fontsize=14, fontweight='bold')
+       plt.legend(fontsize=11)
+       plt.grid(True, alpha=0.3)
+       plt.tight_layout()
+      
+       if save_path:
+           plt.savefig(save_path, dpi=300, bbox_inches='tight')
+           print(f"Plot saved to: {save_path}")
+      
+       plt.show()
+  
+   def plot_optimization_history(self):
+       """Plot optimization progress over generations"""
+       if not self.history['generations']:
+           print("No optimization history available.")
+           return
+      
+       fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+      
+       # Plot 1: Best fitness over generations
+       gens = self.history['generations']
+       best_f1 = [f[0] for f in self.history['best_fitness']]
+       best_f2 = [f[1] for f in self.history['best_fitness']]
+      
+       axes[0, 0].plot(gens, best_f1, 'b-', linewidth=2, label='J1 (Communication)')
+       axes[0, 0].plot(gens, best_f2, 'r-', linewidth=2, label='J2 (Infrastructure)')
+       axes[0, 0].set_xlabel('Generation')
+       axes[0, 0].set_ylabel('Best Fitness Value')
+       axes[0, 0].set_title('Best Fitness Over Generations')
+       axes[0, 0].legend()
+       axes[0, 0].grid(True, alpha=0.3)
+      
+       # Plot 2: Feasible solutions count
+       axes[0, 1].plot(gens, self.history['feasible_count'], 'g-', linewidth=2)
+       axes[0, 1].fill_between(gens, 0, self.history['feasible_count'], alpha=0.3, color='green')
+       axes[0, 1].set_xlabel('Generation')
+       axes[0, 1].set_ylabel('Feasible Solutions')
+       axes[0, 1].set_title('Feasible Solutions Over Generations')
+       axes[0, 1].grid(True, alpha=0.3)
+      
+       # Plot 3: Combined cost
+       total_cost = [f1 + f2 for f1, f2 in self.history['best_fitness']]
+       axes[1, 0].plot(gens, total_cost, 'purple', linewidth=2)
+       axes[1, 0].set_xlabel('Generation')
+       axes[1, 0].set_ylabel('Total Cost (J1 + J2)')
+       axes[1, 0].set_title('Total Cost Over Generations')
+       axes[1, 0].grid(True, alpha=0.3)
+      
+       # Plot 4: Pareto front animation (last generation)
+       if self.best_solutions:
+           feasible = [s for s in self.best_solutions if s['feasible']]
+           if feasible:
+               f1 = [s['fitness'][0] for s in feasible]
+               f2 = [s['fitness'][1] for s in feasible]
+               axes[1, 1].scatter(f1, f2, c='green', s=50, alpha=0.7)
+               axes[1, 1].set_xlabel('J1')
+               axes[1, 1].set_ylabel('J2')
+               axes[1, 1].set_title('Final Pareto Front')
+               axes[1, 1].grid(True, alpha=0.3)
+      
+       plt.tight_layout()
+       plt.show()
+  
+   def create_submission(self, filename="submission.json", top_n=20):
+       """Create submission file"""
+       if not self.best_solutions:
+           print("No solutions to submit. Run optimize() first.")
+           return
+      
+       # Get feasible solutions sorted by total cost
+       feasible_solutions = [s for s in self.best_solutions if s['feasible']]
+       feasible_solutions.sort(key=lambda s: s['fitness'][0] + s['fitness'][1])
+      
+       # Take top N solutions
+       submission_solutions = []
+       for sol in feasible_solutions[:top_n]:
+           # Ensure solution is in correct format
+           x = sol['x']
+           if len(x) == 20:  # Expected length
+               submission_solutions.append(x.tolist() if hasattr(x, 'tolist') else list(x))
+      
+       # If no feasible solutions, use best infeasible
+       if not submission_solutions and self.best_solutions:
+           for sol in self.best_solutions[:top_n]:
+               x = sol['x']
+               if len(x) == 20:
+                   submission_solutions.append(x.tolist() if hasattr(x, 'tolist') else list(x))
+      
+       if not submission_solutions:
+           print("ERROR: No valid solutions found for submission.")
+           return
+      
+       # Create submission data
+       submission_data = {
+           "problem": "quantum-communications-constellations",
+           "challenge": "spoc-2-quantum-communications-constellations",
+           "timestamp": datetime.now().isoformat(),
+           "optimizer": {
+               "name": "QuantumCommunicationsOptimizer",
+               "population_size": self.population_size,
+               "generations": self.generations,
+               "random_seed": self.random_seed
+           },
+           "solutions": submission_solutions,
+           "metadata": {
+               "number_of_solutions": len(submission_solutions),
+               "solution_dimension": len(submission_solutions[0]) if submission_solutions else 0
+           }
+       }
+
