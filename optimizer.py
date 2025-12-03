@@ -497,3 +497,194 @@ class QuantumCommunicationsOptimizer:
            }
        }
 
+# Save to file
+       with open(filename, 'w') as f:
+           json.dump([submission_data], f, indent=2)
+      
+       print(f"\nSubmission created: {filename}")
+       print(f"Number of solutions: {len(submission_solutions)}")
+       print(f"Solution dimension: {len(submission_solutions[0])}")
+      
+       return submission_data
+  
+   def detailed_analysis(self, solution_index=0):
+       """Show detailed analysis for a specific solution"""
+       if not self.best_solutions or solution_index >= len(self.best_solutions):
+           print("Invalid solution index.")
+           return
+      
+       sol = self.best_solutions[solution_index]
+       x = sol['x']
+      
+       print("\n" + "="*60)
+       print(f"DETAILED ANALYSIS - Solution {solution_index + 1}")
+       print("="*60)
+      
+       print(f"\nFeasibility: {'✓ FEASIBLE' if sol['feasible'] else '✗ INFEASIBLE'}")
+       print(f"Communication cost (J1): {sol['fitness'][0]:.6f}")
+       print(f"Infrastructure cost (J2): {sol['fitness'][1]:.6f}")
+       print(f"Total cost (J1+J2): {sum(sol['fitness']):.6f}")
+       print(f"Rover constraint violation: {sol['constraints'][0]:.6f}")
+       print(f"Satellite constraint violation: {sol['constraints'][1]:.6f}")
+      
+       # Decode chromosome
+       try:
+           a1, e1, i1, w1, eta1, a2, e2, i2, w2, eta2, S1, P1, F1, S2, P2, F2, r1, r2, r3, r4 = x
+          
+           print(f"\n{'='*40}")
+           print("WALKER CONSTELLATION 1")
+           print(f"{'='*40}")
+           print(f"  Semi-major axis: {a1:.1f} km (Altitude: {a1 - 6371:.1f} km)")
+           print(f"  Eccentricity: {e1:.6f}")
+           print(f"  Inclination: {np.degrees(i1):.2f}°")
+           print(f"  Argument of perigee: {np.degrees(w1):.2f}°")
+           print(f"  Quality factor (η): {eta1:.1f}")
+           print(f"  Satellites per plane (S1): {int(S1)}")
+           print(f"  Planes (P1): {int(P1)}")
+           print(f"  Phasing factor (F1): {int(F1)}")
+           print(f"  Total satellites: {int(S1 * P1)}")
+           print(f"  Total η contribution: {eta1 * S1 * P1:.1f}")
+          
+           print(f"\n{'='*40}")
+           print("WALKER CONSTELLATION 2")
+           print(f"{'='*40}")
+           print(f"  Semi-major axis: {a2:.1f} km (Altitude: {a2 - 6371:.1f} km)")
+           print(f"  Eccentricity: {e2:.6f}")
+           print(f"  Inclination: {np.degrees(i2):.2f}°")
+           print(f"  Argument of perigee: {np.degrees(w2):.2f}°")
+           print(f"  Quality factor (η): {eta2:.1f}")
+           print(f"  Satellites per plane (S2): {int(S2)}")
+           print(f"  Planes (P2): {int(P2)}")
+           print(f"  Phasing factor (F2): {int(F2)}")
+           print(f"  Total satellites: {int(S2 * P2)}")
+           print(f"  Total η contribution: {eta2 * S2 * P2:.1f}")
+          
+           print(f"\n{'='*40}")
+           print("SUMMARY")
+           print(f"{'='*40}")
+           total_sats = int(S1 * P1 + S2 * P2)
+           total_eta = eta1 * S1 * P1 + eta2 * S2 * P2
+           print(f"  Total satellites: {total_sats}")
+           print(f"  Total quality (η): {total_eta:.1f}")
+           print(f"  Average η per satellite: {total_eta/total_sats if total_sats > 0 else 0:.2f}")
+           print(f"  Rover indices: {int(r1)}, {int(r2)}, {int(r3)}, {int(r4)}")
+          
+       except Exception as e:
+           print(f"Error decoding solution: {e}")
+      
+       return sol
+  
+   def visualize_best_solution(self, solution_index=0):
+       """Visualize the best solution"""
+       if not self.best_solutions or solution_index >= len(self.best_solutions):
+           print("Invalid solution index.")
+           return
+      
+       best_x = self.best_solutions[solution_index]['x']
+      
+       fig = plt.figure(figsize=(18, 6))
+      
+       # Plot for different epochs
+       epochs = [0, self.n_epochs//2, self.n_epochs-1]
+       for i, epoch in enumerate(epochs):
+           ax = fig.add_subplot(1, 3, i+1, projection='3d')
+          
+           # Use the plot method from constellation_udp
+           try:
+               self.udp.plot(best_x, src=0, dst=0, ep=epoch)
+               ax.set_title(f'Epoch {epoch} (Time: {epoch*self.udp._duration/self.udp.n_epochs:.1f} days)')
+           except:
+               # Fallback simple plot
+               ax.set_title(f'Epoch {epoch} (Plot failed)')
+      
+       plt.suptitle(f'Solution {solution_index + 1} Visualization', fontsize=16, fontweight='bold')
+       plt.tight_layout()
+       plt.show()
+  
+   def export_results(self, filename="optimization_results.json"):
+       """Export all optimization results"""
+       if not self.best_solutions:
+           print("No results to export.")
+           return
+      
+       export_data = {
+           "optimization_parameters": {
+               "population_size": self.population_size,
+               "generations": self.generations,
+               "random_seed": self.random_seed,
+               "timestamp": datetime.now().isoformat()
+           },
+           "history": self.history,
+           "best_solutions": [
+               {
+                   "x": sol['x'].tolist() if hasattr(sol['x'], 'tolist') else list(sol['x']),
+                   "fitness": sol['fitness'].tolist() if hasattr(sol['fitness'], 'tolist') else list(sol['fitness']),
+                   "constraints": sol['constraints'].tolist() if hasattr(sol['constraints'], 'tolist') else list(sol['constraints']),
+                   "feasible": sol['feasible'],
+                   "decoded": sol.get('decoded', {})
+               }
+               for sol in self.best_solutions
+           ]
+       }
+      
+       with open(filename, 'w') as f:
+           json.dump(export_data, f, indent=2)
+      
+       print(f"Results exported to: {filename}")
+
+
+
+
+# Quick test function
+def run_optimization_demo(population_size=30, generations=50):
+   """Run a quick demo of the optimization"""
+  
+   if not PYGMO_AVAILABLE or not CONSTELLATION_UDP_AVAILABLE:
+       print("Required dependencies not available.")
+       print("Install with: pip install pygmo")
+       return
+  
+   print("Running optimization demo...")
+  
+   # Create optimizer
+   optimizer = QuantumCommunicationsOptimizer(
+       population_size=population_size,
+       generations=generations,
+       random_seed=42
+   )
+  
+   # Run optimization
+   solutions = optimizer.optimize(verbose=True)
+  
+   if solutions:
+       # Analyze results
+       optimizer.analyze_solutions(show_top=5)
+      
+       # Plot Pareto front
+       optimizer.plot_pareto_front()
+      
+       # Plot optimization history
+       optimizer.plot_optimization_history()
+      
+       # Create submission
+       optimizer.create_submission()
+      
+       # Detailed analysis of best solution
+       optimizer.detailed_analysis(0)
+      
+       # Export results
+       optimizer.export_results()
+  
+   return optimizer
+
+
+
+
+if __name__ == "__main__":
+   # Test with smaller parameters for quick demo
+   optimizer = run_optimization_demo(population_size=20, generations=30)
+
+
+  
+
+
