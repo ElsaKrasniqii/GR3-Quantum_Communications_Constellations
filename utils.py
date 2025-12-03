@@ -67,3 +67,76 @@ def combine_scores(points, ref_point=None):
     except Exception as e:
         print(f"Error in hypervolume calculation: {e}")
         return 0.0
+    
+
+    def save_solutions(solutions, filename="solutions_backup.json", metadata=None):
+    """Save solutions to a JSON file for later use"""
+    try:
+        solutions_data = []
+        for sol in solutions:
+            solution_data = {
+                "x": sol['x'].tolist() if hasattr(sol['x'], 'tolist') else list(sol['x']),
+                "fitness": sol['fitness'].tolist() if hasattr(sol['fitness'], 'tolist') else list(sol['fitness']),
+                "constraints": sol['constraints'].tolist() if hasattr(sol['constraints'], 'tolist') else list(sol['constraints']),
+                "feasible": sol['feasible']
+            }
+            if 'decoded' in sol:
+                solution_data['decoded'] = sol['decoded']
+            solutions_data.append(solution_data)
+        
+        if metadata is None:
+            metadata = {}
+        
+        data = {
+            "timestamp": datetime.now().isoformat(),
+            "number_of_solutions": len(solutions),
+            "solution_dimension": len(solutions[0]['x']) if solutions else 0,
+            "metadata": metadata,
+            "solutions": solutions_data
+        }
+        
+        with open(filename, 'w') as f:
+            json.dump(data, f, indent=2, default=str)
+        
+        print(f"✓ Saved {len(solutions)} solutions to {filename}")
+        return True
+        
+    except Exception as e:
+        print(f"✗ Error saving solutions: {e}")
+        return False
+
+
+def load_solutions(filename="solutions_backup.json", verbose=True):
+    """Load solutions from a JSON file"""
+    try:
+        with open(filename, 'r') as f:
+            data = json.load(f)
+        
+        solutions = []
+        for sol_data in data['solutions']:
+            solution = {
+                "x": np.array(sol_data['x']),
+                "fitness": np.array(sol_data['fitness']),
+                "constraints": np.array(sol_data['constraints']),
+                "feasible": sol_data['feasible']
+            }
+            if 'decoded' in sol_data:
+                solution['decoded'] = sol_data['decoded']
+            solutions.append(solution)
+        
+        if verbose:
+            print(f"✓ Loaded {len(solutions)} solutions from {filename}")
+            print(f"  Timestamp: {data['timestamp']}")
+            print(f"  Solution dimension: {data['solution_dimension']}")
+        
+        return solutions
+        
+    except FileNotFoundError:
+        print(f"✗ File {filename} not found")
+        return []
+    except json.JSONDecodeError:
+        print(f"✗ Error parsing JSON file {filename}")
+        return []
+    except Exception as e:
+        print(f"✗ Error loading solutions: {e}")
+        return []
