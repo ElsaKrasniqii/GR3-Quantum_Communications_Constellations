@@ -3,6 +3,9 @@ import numpy as np
 import json
 from datetime import datetime
 import warnings
+from datetime import datetime
+import json
+
 warnings.filterwarnings('ignore')
 
 __version__ = "1.0.0"
@@ -69,24 +72,32 @@ def combine_scores(points, ref_point=None):
         return 0.0
     
 
-    def save_solutions(solutions, filename="solutions_backup.json", metadata=None):
+  def save_solutions(solutions, filename="solutions_backup.json", metadata=None):
     """Save solutions to a JSON file for later use"""
     try:
         solutions_data = []
         for sol in solutions:
+
+            # Verify required keys exist
+            for key in ["x", "fitness", "constraints", "feasible"]:
+                if key not in sol:
+                    raise KeyError(f"Missing key '{key}' in solution: {sol}")
+
             solution_data = {
                 "x": sol['x'].tolist() if hasattr(sol['x'], 'tolist') else list(sol['x']),
                 "fitness": sol['fitness'].tolist() if hasattr(sol['fitness'], 'tolist') else list(sol['fitness']),
                 "constraints": sol['constraints'].tolist() if hasattr(sol['constraints'], 'tolist') else list(sol['constraints']),
                 "feasible": sol['feasible']
             }
+
             if 'decoded' in sol:
                 solution_data['decoded'] = sol['decoded']
+
             solutions_data.append(solution_data)
-        
+
         if metadata is None:
             metadata = {}
-        
+
         data = {
             "timestamp": datetime.now().isoformat(),
             "number_of_solutions": len(solutions),
@@ -94,13 +105,13 @@ def combine_scores(points, ref_point=None):
             "metadata": metadata,
             "solutions": solutions_data
         }
-        
+
         with open(filename, 'w') as f:
             json.dump(data, f, indent=2, default=str)
-        
+
         print(f"✓ Saved {len(solutions)} solutions to {filename}")
         return True
-        
+
     except Exception as e:
         print(f"✗ Error saving solutions: {e}")
         return False
