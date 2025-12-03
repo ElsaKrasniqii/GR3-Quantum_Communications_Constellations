@@ -207,3 +207,85 @@ class constellation_udp:
             return 0  # No valid distances found
         return self._min_sat_dist - dmin
 
+
+    ###############################################################
+    #   GRAPH FUNCTIONS
+    ###############################################################
+    def line_of_sight(self, r1, r2):
+        d = np.linalg.norm(r2 - r1)
+        if d < 1e-6:
+            return np.linalg.norm(r1)
+        r21 = (r2 - r1) / d
+        h1 = np.dot(r1, r21)
+        arg = np.linalg.norm(r1)**2 - h1**2
+        return np.sqrt(max(arg, 0))
+
+
+    def zenith_angle(self, src, dst):
+        d = dst - src
+        d_norm = np.linalg.norm(d)
+        src_norm = np.linalg.norm(src)
+        if d_norm < 1e-6 or src_norm < 1e-6:
+            return 0
+        return np.dot(d, src) / (d_norm * src_norm)
+
+
+    def qkd_metric(self, idx, src, dst, cosz, eta):
+        ew = -np.log(max(eta, 1e-10))
+        d = np.linalg.norm(src - dst)
+        ew += 2 * np.log(max(d, 1e-3))
+        ew = max(ew, 1e-3)
+
+        # Rover-specific penalty
+        if idx <= self.n_rovers:
+            if cosz >= self.eps_z:
+                zenith = np.pi/2 - np.arccos(min(max(cosz, -1), 1))
+                ew += 1.0 / max(np.sin(zenith), 1e-3)
+            else:
+                ew = 0
+        return ew, d
+
+
+    ###############################################################
+    def build_graph(self, ep, pos, n1, eta):
+        N = pos.shape[0]
+        adj = np.zeros((N, N))
+        dmin = np.inf
+
+        for i in range(N):
+            for j in range(i):
+                los = self.line_of_sight(pos[i], pos[j])
+                cosz = self.zenith_angle(pos[i], pos[j])
+
+                if los < self.LOS and cosz <= 0:  # Fixed condition
+                    et = eta[0] if j < n1 else eta[1]
+                    adj[i, j], d = self.qkd_metric(N-i, pos[i], pos[j], cosz, et)
+                    dmin = min(dmin, d)
+                    adj[j, i] = adj[i, j]
+
+        return nx.from_numpy_array(adj), adj, dmin
+
+
+    ###############################################################
+    def average_shortest_path(self, G, nm, nr, ep, verbose=False):
+        r = 0
+        N = len(G.nodes())
+
+        for i in range(nr):
+            for j in range(nm):
+                try:
+                    path_len = nx.shortest_path_length(
+                        G,
+                        N - nm - nr + j,
+                        N - nr + i,
+                        weight="weight",
+                        method="dijkstra"
+                    )
+                    r += path_len
+                except nx.NetworkXNoPath:
+                    if verbose:
+                        print(f"No path between mothership {j} and rover {i}")
+                    r += 1e4
+
+        return r / (nm * nr) if nm * nr > 0 else 1e4
+
