@@ -289,3 +289,164 @@ class constellation_udp:
 
         return r / (nm * nr) if nm * nr > 0 else 1e4
 
+
+    ###############################################################
+    #   CONSTRUCT WALKERS
+    ###############################################################
+    def construct_walkers(self, x):
+        # Extract parameters
+        a1, e1, i1, w1, eta1, a2, e2, i2, w2, eta2, S1, P1, F1, S2, P2, F2, *rovers = x
+        
+        # Convert to integers
+        S1, P1, F1 = int(S1), int(P1), int(F1)
+        S2, P2, F2 = int(S2), int(P2), int(F2)
+        
+        # Generate walker constellations
+        w1_arr = self.generate_walker(S1, P1, F1, a1, e1, i1, w1, self._t0)
+        w2_arr = self.generate_walker(S2, P2, F2, a2, e2, i2, w2, self._t0)
+        
+        return w1_arr, w2_arr
+
+
+    ###############################################################
+    #   FITNESS FUNCTION
+    ###############################################################
+    def fitness(self, x, verbose=False):
+        w1, w2 = self.construct_walkers(x)
+        
+        # Extract parameters
+        a1, e1, i1, w1_angle, eta1, a2, e2, i2, w2_angle, eta2, S1, P1, F1, S2, P2, F2, *rovers = x
+        S1, P1, S2, P2 = int(S1), int(P1), int(S2), int(P2)
+        
+        N1 = S1 * P1
+        N2 = S2 * P2
+
+        # Get rover indices (ensure they're valid)
+        rover_indices = [int(r) % len(self.lambdas) for r in rovers[:4]]
+        lamb0 = self.lambdas[rover_indices]
+        phi0 = self.phis[rover_indices]
+        
+        rovers_pos = self.construct_rover_pos(lamb0, phi0)
+        pos = self.construct_pos(w1, w2, rovers_pos)
+
+        f1 = 0
+        dmin_ep = np.inf
+        valid_epochs = 0
+
+        for ep in range(1, self.n_epochs):
+            G, _, dmin = self.build_graph(ep, pos[:, ep, :], N1, (eta1, eta2))
+            dmin_ep = min(dmin_ep, dmin)
+            
+            avg_path = self.average_shortest_path(G, self.n_motherships, self.n_rovers, ep, verbose)
+            f1 += avg_path
+            valid_epochs += 1
+
+        f1 = f1 / max(valid_epochs, 1)
+        f2 = eta1 * N1 + eta2 * N2
+
+        rc, rdm = self.get_rover_constraint(lamb0, phi0)
+        sc = self.get_sat_constraint(dmin_ep)
+
+        if verbose:
+            print(f"Fitness components: f1={f1:.2f}, f2={f2:.2f}, rc={rc:.2f}, sc={sc:.2f}")
+            print(f"Rover min distance: {rdm:.2f} km, Satellite min distance: {dmin_ep:.2f} km")
+
+        return [f1/34, f2/100000, rc, sc]
+
+
+    ###############################################################
+    #   EXAMPLE INPUT
+    ###############################################################
+    def example(self, verbose=False):
+        # Parameters: a,e,i,w,eta for walker1, same for walker2, 
+        # S,P,F for walker1, S,P,F for walker2, 4 rover indices
+        return [7000, 0.001, 1.2, 0, 55, 
+                8000, 0.001, 1.2, 0, 15, 
+                10, 2, 1, 
+                10, 2, 1, 
+                13, 21, 34, 55]
+
+
+    ###############################################################
+    #   PLOTTING
+    ###############################################################
+    def plot(self, x, src=1, dst=1, ep=1, lims=10000):
+        sns.set(style="darkgrid")
+        plt.style.use("dark_background")
+
+        fig = plt.figure(figsize=(10, 8))
+        ax = fig.add_subplot(111, projection='3d')
+
+        w1, w2 = self.construct_walkers(x)
+
+        # Get rover positions
+        rover_indices = [int(r) % len(self.lambdas) for r in x[-4:]]
+        lamb0 = self.lambdas[rover_indices]
+        phi0 = self.phis[rover_indices]
+        rv = self.construct_rover_pos(lamb0, phi0)
+        
+        # Get all positions
+        pos = self.construct_pos(w1, w2, rv)
+
+        # Plot satellites (different colors for different groups)
+        total_sats = pos.shape[0]
+        colors = ['blue'] * (int(x[10]) * int(x[11])) + \
+                 ['green'] * (int(x[14]) * int(x[15])) + \
+                 ['red'] * self.n_motherships + \
+                 ['yellow'] * self.n_rovers
+        
+        ax.scatter(pos[:, ep, 0], pos[:, ep, 1], pos[:, ep, 2], 
+                  s=20, c=colors[:total_sats], alpha=0.7)
+
+        # Earth
+        r = pk.EARTH_RADIUS/1000
+        u, v = np.mgrid[0:2*np.pi:30j, 0:np.pi:20j]
+        x_earth = r * np.cos(u) * np.sin(v)
+        y_earth = r * np.sin(u) * np.sin(v)
+        z_earth = r * np.cos(v)
+        ax.plot_surface(x_earth, y_earth, z_earth,
+                        alpha=0.2, color="blue", edgecolor='none')
+
+        ax.set_xlim(-lims, lims)
+        ax.set_ylim(-lims, lims)
+        ax.set_zlim(-lims, lims)
+        ax.set_xlabel('X (km)')
+        ax.set_ylabel('Y (km)')
+        ax.set_zlabel('Z (km)')
+        ax.set_title(f'Constellation at epoch {ep}')
+        
+        return ax
+
+
+###############################################################
+#   MAIN TEST RUN
+###############################################################
+if __name__ == "__main__":
+    print("\n=== RUNNING CONSTELLATION UDP ===\n")
+
+    try:
+        udp = constellation_udp()
+        x = udp.example(verbose=True)
+        
+        print(f"Example parameters: {x}")
+        print(f"Number of rovers in database: {len(udp.lambdas)}")
+
+        print("\nComputing fitness...")
+        fitness = udp.fitness(x, verbose=True)
+        print(f"Fitness values: {fitness}")
+
+        print("\nPlotting...")
+        ax = udp.plot(x, src=1, dst=1, ep=1, lims=20000)
+        plt.show()
+
+        print("\n=== FINISHED SUCCESSFULLY ===")
+        
+    except FileNotFoundError as e:
+        print(f"ERROR: {e}")
+        print("Please ensure the rovers.txt file exists in ./data/spoc2/constellations/")
+    except Exception as e:
+        print(f"ERROR: {e}")
+        import traceback
+        traceback.print_exc()
+
+        
