@@ -150,3 +150,60 @@ class constellation_udp:
 
         return SatrecArray(sats)
 
+
+    ###############################################################
+    #   COMBINE POSITIONS
+    ###############################################################
+    def construct_pos(self, w1, w2, rovers):
+        err1, p1, _ = w1.sgp4(self.jds, self.frs)
+        err2, p2, _ = w2.sgp4(self.jds, self.frs)
+
+        if not np.all(err1 == 0) or not np.all(err2 == 0):
+            print(f"Walker errors: w1={np.sum(err1 != 0)}, w2={np.sum(err2 != 0)}")
+            # Don't raise, just continue with valid positions
+
+        # Combine all positions: w1, w2, motherships, rovers
+        all_pos = []
+        if len(p1) > 0:
+            all_pos.append(p1)
+        if len(p2) > 0:
+            all_pos.append(p2)
+        all_pos.append(self.pos_m)
+        all_pos.append(rovers)
+        
+        return np.concatenate(all_pos, axis=0)
+
+
+    ###############################################################
+    #   CONSTRAINT FUNCTIONS
+    ###############################################################
+    def get_rover_constraint(self, lambda0, phi0):
+        # Calculate current positions at time 0
+        pos = np.zeros((self.n_rovers, 3))
+        t = 0
+        pos[:, 0] = self.R_p * np.cos(lambda0) * np.cos(phi0 + self.w_p * t)
+        pos[:, 1] = self.R_p * np.cos(lambda0) * np.sin(phi0 + self.w_p * t)
+        pos[:, 2] = self.R_p * np.sin(lambda0)
+
+        # Calculate angular distance
+        def angular_distance(u, v):
+            # u and v are unit vectors from center
+            u_norm = u / np.linalg.norm(u)
+            v_norm = v / np.linalg.norm(v)
+            dot = np.clip(np.dot(u_norm, v_norm), -1.0, 1.0)
+            return np.arccos(dot)
+
+        d = scipy.spatial.distance.cdist(
+            pos, pos,
+            lambda u, v: pk.EARTH_RADIUS/1000 * angular_distance(u, v)
+        )
+        np.fill_diagonal(d, np.inf)
+        min_dist = np.min(d)
+        return self._min_rover_dist - min_dist, min_dist
+
+
+    def get_sat_constraint(self, dmin):
+        if dmin == np.inf:
+            return 0  # No valid distances found
+        return self._min_sat_dist - dmin
+
