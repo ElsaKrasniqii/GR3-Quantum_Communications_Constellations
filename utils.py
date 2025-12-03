@@ -329,3 +329,81 @@ def print_solution_summary(x, udp_instance=None):
         print("="*60)
     
     return all_available, available_critical, dependencies
+
+
+def validate_solution(x, udp_instance=None):
+    """Validate a solution vector"""
+    validation = {
+        'valid': True,
+        'errors': [],
+        'warnings': [],
+        'parameters': {}
+    }
+    
+    try:
+        # Check length
+        if len(x) != 20:
+            validation['valid'] = False
+            validation['errors'].append(f"Expected 20 parameters, got {len(x)}")
+            return validation
+        
+        # Parse parameters
+        a1, e1, i1, w1, eta1, a2, e2, i2, w2, eta2, S1, P1, F1, S2, P2, F2, r1, r2, r3, r4 = x
+        
+        # Store parameter ranges
+        validation['parameters'] = {
+            'a1': a1, 'e1': e1, 'i1': i1, 'w1': w1, 'eta1': eta1,
+            'a2': a2, 'e2': e2, 'i2': i2, 'w2': w2, 'eta2': eta2,
+            'S1': S1, 'P1': P1, 'F1': F1,
+            'S2': S2, 'P2': P2, 'F2': F2,
+            'r1': r1, 'r2': r2, 'r3': r3, 'r4': r4
+        }
+        
+        # Check parameter ranges
+        # Semi-major axis (should be > Earth radius ~6371 km)
+        if a1 < 6371:
+            validation['warnings'].append(f"Walker 1 semi-major axis ({a1:.1f} km) is below Earth radius")
+        if a2 < 6371:
+            validation['warnings'].append(f"Walker 2 semi-major axis ({a2:.1f} km) is below Earth radius")
+        
+        # Eccentricity (should be between 0 and 1 for elliptical orbits)
+        if e1 < 0 or e1 >= 1:
+            validation['errors'].append(f"Walker 1 eccentricity ({e1:.6f}) must be in [0, 1)")
+        if e2 < 0 or e2 >= 1:
+            validation['errors'].append(f"Walker 2 eccentricity ({e2:.6f}) must be in [0, 1)")
+        
+        # Inclination (should be in radians, typically [0, π])
+        if i1 < 0 or i1 > np.pi:
+            validation['warnings'].append(f"Walker 1 inclination ({np.degrees(i1):.1f}°) outside typical range [0°, 180°]")
+        if i2 < 0 or i2 > np.pi:
+            validation['warnings'].append(f"Walker 2 inclination ({np.degrees(i2):.1f}°) outside typical range [0°, 180°]")
+        
+        # Quality factor (eta) - positive
+        if eta1 < 0:
+            validation['warnings'].append(f"Walker 1 quality factor ({eta1:.1f}) is negative")
+        if eta2 < 0:
+            validation['warnings'].append(f"Walker 2 quality factor ({eta2:.1f}) is negative")
+        
+        # Constellation parameters (should be positive integers)
+        for name, value in [('S1', S1), ('P1', P1), ('F1', F1), ('S2', S2), ('P2', P2), ('F2', F2)]:
+            if value <= 0:
+                validation['errors'].append(f"{name} ({value}) must be positive")
+            if not np.isclose(value, np.round(value)):
+                validation['warnings'].append(f"{name} ({value}) is not an integer")
+        
+        # Rover indices (should be valid indices)
+        for i, r in enumerate([r1, r2, r3, r4], 1):
+            if r < 0:
+                validation['warnings'].append(f"Rover {i} index ({r}) is negative")
+            if not np.isclose(r, np.round(r)):
+                validation['warnings'].append(f"Rover {i} index ({r}) is not an integer")
+        
+        # Update validity based on errors
+        if validation['errors']:
+            validation['valid'] = False
+        
+    except Exception as e:
+        validation['valid'] = False
+        validation['errors'].append(f"Validation error: {e}")
+    
+    return validation
