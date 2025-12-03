@@ -675,3 +675,32 @@ __all__ = [
     'validate_solution',
     'print_validation_results'
 ]
+def combine_scores(points, ref_point=None):
+    """
+    Function for aggregating single solutions into one score using hypervolume indicator
+    
+    Parameters:
+    -----------
+    points : list or np.ndarray
+        List of solution fitness values (each should have at least 2 objectives)
+    ref_point : np.ndarray, optional
+        Reference point for hypervolume calculation. Default is [1.2, 1.4]
+    
+    Returns:
+    --------
+    float : Hypervolume indicator (negative for minimization)
+    
+    Raises:
+    -------
+    ValueError: If points array has invalid shape or dimensions
+    TypeError: If inputs are not of expected types
+    
+    Examples:
+    ---------
+    >>> points = [[0.5, 0.3], [0.6, 0.2], [0.4, 0.4]]
+    >>> score = combine_scores(points)
+    >>> print(f"Hypervolume score: {score}")
+    """
+    try:
+        # Validate inputs
+        if
