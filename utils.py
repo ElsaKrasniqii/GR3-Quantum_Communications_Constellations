@@ -6,6 +6,7 @@ import warnings
 from datetime import datetime
 import json
 
+
 warnings.filterwarnings('ignore')
 
 __version__ = "1.0.0"
@@ -151,3 +152,86 @@ def load_solutions(filename="solutions_backup.json", verbose=True):
     except Exception as e:
         print(f"✗ Error loading solutions: {e}")
         return []
+    
+
+
+def print_solution_summary(x, udp_instance=None):
+    """Print a clean and safe summary of a solution"""
+
+    try:
+        # Ensure x can be treated as a list
+        x = list(x)
+
+        if len(x) != 20:
+            print(f"Warning: Expected 20 parameters, got {len(x)}")
+            return
+
+        # Unpack parameters
+        (a1, e1, i1, w1, eta1,
+         a2, e2, i2, w2, eta2,
+         S1, P1, F1, S2, P2, F2,
+         r1, r2, r3, r4) = x
+
+        print("\n" + "="*60)
+        print("SOLUTION SUMMARY")
+        print("="*60)
+
+        # ---------------- WALKER 1 ----------------
+        print("\n--- WALKER CONSTELLATION 1 ---")
+        print(f"  Semi-major axis: {a1:.1f} km (Altitude: {a1 - 6371:.1f} km)")
+        print(f"  Eccentricity: {e1:.6f}")
+        print(f"  Inclination: {np.degrees(i1):.2f}°")
+        print(f"  Argument of perigee: {np.degrees(w1):.2f}°")
+        print(f"  Quality factor (η): {eta1:.1f}")
+        print(f"  Satellites per plane (S): {int(S1)}")
+        print(f"  Planes (P): {int(P1)}")
+        print(f"  Phasing factor (F): {int(F1)}")
+        print(f"  Total satellites: {int(S1 * P1)}")
+
+        # ---------------- WALKER 2 ----------------
+        print("\n--- WALKER CONSTELLATION 2 ---")
+        print(f"  Semi-major axis: {a2:.1f} km (Altitude: {a2 - 6371:.1f} km)")
+        print(f"  Eccentricity: {e2:.6f}")
+        print(f"  Inclination: {np.degrees(i2):.2f}°")
+        print(f"  Argument of perigee: {np.degrees(w2):.2f}°")
+        print(f"  Quality factor (η): {eta2:.1f}")
+        print(f"  Satellites per plane (S): {int(S2)}")
+        print(f"  Planes (P): {int(P2)}")
+        print(f"  Phasing factor (F): {int(F2)}")
+        print(f"  Total satellites: {int(S2 * P2)}")
+
+        # ---------------- SUMMARY ----------------
+        print("\n--- SUMMARY ---")
+        total_sats = int(S1 * P1 + S2 * P2)
+        total_eta = eta1 * S1 * P1 + eta2 * S2 * P2
+
+        print(f"  Total satellites: {total_sats}")
+        print(f"  Total quality (η): {total_eta:.1f}")
+        print(f"  Average η per satellite: {total_eta/total_sats if total_sats>0 else 0:.2f}")
+        print(f"  Rover indices: {int(r1)}, {int(r2)}, {int(r3)}, {int(r4)}")
+
+        # ---------------- FITNESS EVALUATION ----------------
+        if udp_instance is not None:
+            try:
+                f = udp_instance.fitness(x)
+
+                print("\n--- FITNESS EVALUATION ---")
+
+                if isinstance(f, (list, tuple)) and len(f) == 4:
+                    f1, f2, c1, c2 = f
+                    print(f"  J1 (Communication): {f1:.6f}")
+                    print(f"  J2 (Infrastructure): {f2:.6f}")
+                    print(f"  Total cost (J1+J2): {f1 + f2:.6f}")
+                    print(f"  Rover constraint: {c1:.6f} ({'✓ OK' if c1 <= 0 else '✗ VIOLATED'})")
+                    print(f"  Satellite constraint: {c2:.6f} ({'✓ OK' if c2 <= 0 else '✗ VIOLATED'})")
+                    print(f"  Feasible: {'✓ YES' if c1 <= 0 and c2 <= 0 else '✗ NO'}")
+                else:
+                    print("  Fitness result:", f)
+
+            except Exception as e:
+                print(f"⚠ Could not evaluate fitness: {e}")
+
+        print("="*60 + "\n")
+
+    except Exception as e:
+        print(f"Error printing solution summary: {e}")
