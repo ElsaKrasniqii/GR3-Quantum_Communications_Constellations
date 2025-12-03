@@ -235,3 +235,97 @@ def print_solution_summary(x, udp_instance=None):
 
     except Exception as e:
         print(f"Error printing solution summary: {e}")
+
+
+        def check_dependencies(verbose=True):
+    """Check if all required dependencies are available"""
+    dependencies = {
+        'pykep': {'available': False, 'critical': True, 'version': None, 'install': 'pip install pykep'},
+        'sgp4': {'available': False, 'critical': True, 'version': None, 'install': 'pip install sgp4'},
+        'networkx': {'available': False, 'critical': True, 'version': None, 'install': 'pip install networkx'},
+        'pygmo': {'available': False, 'critical': False, 'version': None, 'install': 'pip install pygmo'},
+        'scipy': {'available': False, 'critical': True, 'version': None, 'install': 'pip install scipy'},
+        'numpy': {'available': False, 'critical': True, 'version': None, 'install': 'pip install numpy'},
+        'matplotlib': {'available': False, 'critical': False, 'version': None, 'install': 'pip install matplotlib'},
+        'seaborn': {'available': False, 'critical': False, 'version': None, 'install': 'pip install seaborn'}
+    }
+    
+    # Check numpy first
+    try:
+        import numpy as np
+        dependencies['numpy']['available'] = True
+        dependencies['numpy']['version'] = np.__version__
+    except ImportError:
+        pass
+    
+    # Check other dependencies
+    for dep in dependencies:
+        if dep == 'numpy':
+            continue
+            
+        try:
+            if dep == 'pykep':
+                import pykep
+                version = getattr(pykep, '__version__', 'unknown')
+            elif dep == 'sgp4':
+                from sgp4.api import Satrec
+                import sgp4
+                version = getattr(sgp4, '__version__', 'unknown')
+            elif dep == 'networkx':
+                import networkx as nx
+                version = nx.__version__
+            elif dep == 'pygmo':
+                import pygmo as pg
+                version = pg.__version__
+            elif dep == 'scipy':
+                import scipy
+                version = scipy.__version__
+            elif dep == 'matplotlib':
+                import matplotlib
+                version = matplotlib.__version__
+            elif dep == 'seaborn':
+                import seaborn as sns
+                version = sns.__version__
+            
+            dependencies[dep]['available'] = True
+            dependencies[dep]['version'] = version
+        except ImportError:
+            pass
+    
+    # Determine status
+    critical_deps = [dep for dep, info in dependencies.items() if info['critical']]
+    available_critical = all(dependencies[dep]['available'] for dep in critical_deps)
+    all_available = all(info['available'] for info in dependencies.values())
+    
+    if verbose:
+        print("\n" + "="*60)
+        print("DEPENDENCY CHECK")
+        print("="*60)
+        
+        print("\nCritical Dependencies:")
+        for dep in critical_deps:
+            info = dependencies[dep]
+            status = "✓" if info['available'] else "✗"
+            version = f"v{info['version']}" if info['version'] else "not installed"
+            print(f"  {status} {dep:15} {version:20}")
+            if not info['available']:
+                print(f"       Install with: {info['install']}")
+        
+        print("\nOptional Dependencies:")
+        optional_deps = [dep for dep, info in dependencies.items() if not info['critical']]
+        for dep in optional_deps:
+            info = dependencies[dep]
+            status = "✓" if info['available'] else "✗"
+            version = f"v{info['version']}" if info['version'] else "not installed"
+            print(f"  {status} {dep:15} {version:20}")
+            if not info['available']:
+                print(f"       Install with: {info['install']}")
+        
+        print("\n" + "="*60)
+        if available_critical:
+            print("✓ All critical dependencies are available!")
+        else:
+            print("✗ Some critical dependencies are missing!")
+        print("="*60)
+    
+    return all_available, available_critical, dependencies
