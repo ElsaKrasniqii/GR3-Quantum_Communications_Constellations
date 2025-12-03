@@ -89,3 +89,26 @@ class constellation_udp:
         self.eps_z = np.cos(np.pi / 3)
         self._min_sat_dist = 50
 
+
+    ###############################################################
+    #   POSITION FUNCTIONS
+    ###############################################################
+    def construct_mothership_pos(self, motherships):
+        err, pos, _ = motherships.sgp4(self.jds, self.frs)
+        if not np.all(err == 0):
+            raise ValueError("Mothership SGP4 propagation failed")
+        return pos
+
+
+    def construct_rover_pos(self, lambda0, phi0):
+        pos = np.zeros((self.n_rovers, self.n_epochs, 3))
+        times = (self.jds - self.jds[0]) * 24 * 3600
+
+        for i, t in enumerate(times):
+            # Fixed: Corrected spherical to Cartesian conversion
+            pos[:, i, 0] = self.R_p * np.cos(lambda0) * np.cos(phi0 + self.w_p * t)
+            pos[:, i, 1] = self.R_p * np.cos(lambda0) * np.sin(phi0 + self.w_p * t)
+            pos[:, i, 2] = self.R_p * np.sin(lambda0)
+
+        return pos
+
