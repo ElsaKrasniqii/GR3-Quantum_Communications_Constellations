@@ -566,3 +566,112 @@ if __name__ == "__main__":
     print(f"Hypervolume score for test points: {hv_score:.4f}")
     
     print("\nUtility functions test completed!")
+
+
+
+    def combine_scores(points, ref_point=None):
+          """
+    Aggregates multi-objective fitness values using a hypervolume indicator.
+
+    Parameters
+    ----------
+    points : list or np.ndarray
+        List of solution fitness values (each solution must have >= 2 objectives)
+    ref_point : np.ndarray, optional
+        Reference point for hypervolume calculation (default: [1.2, 1.4])
+
+    Returns
+    -------
+    float
+        Hypervolume indicator (negative because problem is minimization)
+    """
+        
+        
+
+
+    try:
+        import pygmo as pg
+        
+        if ref_point is None:
+            ref_point = np.array([1.2, 1.4])
+        
+        # Ensure points is a numpy array
+        points_array = np.array(points)
+        
+        # Check if points have at least 2 objectives
+        if points_array.shape[1] < 2:
+            raise ValueError("Points must have at least 2 objectives for hypervolume calculation")
+        
+        # Filter points that dominate the reference point
+        # Vectorized approach for better performance
+        valid_mask = ~np.any(np.isnan(points_array) | np.isinf(points_array), axis=1)
+        points_array = points_array[valid_mask]
+        
+        if len(points_array) == 0:
+            print("Warning: No valid points after filtering NaN/inf")
+            return 0.0
+        
+        # For minimization, point dominates ref_point if all objectives are <= ref_point
+        dominates_mask = np.all(points_array[:, :2] <= ref_point, axis=1)
+        filtered_points = points_array[dominates_mask, :2]
+        
+        if len(filtered_points) == 0:
+            print("Warning: No solutions dominate the reference point")
+            return 0.0
+        else:
+            # Normalize points to ensure proper hypervolume calculation
+            # Add small epsilon to avoid division by zero
+            max_vals = filtered_points.max(axis=0) + 1e-10
+            min_vals = filtered_points.min(axis=0)
+            
+            # Normalize to [0, 1] range
+            normalized_points = (filtered_points - min_vals) / (max_vals - min_vals)
+            normalized_ref = (ref_point - min_vals[:2]) / (max_vals[:2] - min_vals[:2])
+            
+            hv = pg.hypervolume(normalized_points)
+            hypervolume_value = hv.compute(normalized_ref)
+            
+            # Scale hypervolume for better numerical stability
+            scaled_hv = -hypervolume_value * 10000
+            
+            print(f"Hypervolume calculation: {len(filtered_points)} points, HV = {hypervolume_value:.6f}")
+            return scaled_hv
+            
+    except ImportError:
+        print("Pygmo not available for hypervolume computation. Using simple aggregation.")
+        # Fallback: use sum of normalized objectives
+        if len(points) > 0:
+            points_array = np.array(points)
+            if points_array.shape[1] >= 2:
+                # Simple aggregation: sum of normalized objectives
+                normalized = points_array[:, :2] / np.max(points_array[:, :2], axis=0)
+                return -np.sum(np.min(normalized, axis=0))
+        return 0.0
+    except Exception as e:
+        print(f"Error in hypervolume calculation: {e}")
+        return 0.0
+    
+    """
+Utility functions for Quantum Communications Constellations Optimizer
+
+This module provides helper functions for:
+- Solution persistence (save/load)
+- Hypervolume calculation for multi-objective optimization
+- Solution validation and analysis
+- Dependency checking
+- Formatted output display
+
+Author: Quantum Communications Team
+Date: 2025
+Version: 1.0.0
+"""
+
+__all__ = [
+    'combine_scores',
+    'save_solutions',
+    'load_solutions',
+    'print_solution_summary',
+    'check_dependencies',
+    'validate_solution',
+    'print_validation_results'
+]
