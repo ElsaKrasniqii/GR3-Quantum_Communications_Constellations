@@ -499,3 +499,34 @@ def validate_solution(x, udp_instance=None):
 
 
 
+def print_validation_results(validation):
+    """Print validation results in a readable format"""
+    print("\n" + "="*60)
+    print("SOLUTION VALIDATION")
+    print("="*60)
+    
+    if validation['valid']:
+        print("✓ Solution is VALID")
+    else:
+        print("✗ Solution is INVALID")
+    
+    if validation['errors']:
+        print("\nERRORS:")
+        for error in validation['errors']:
+            print(f"  ✗ {error}")
+    
+    if validation['warnings']:
+        print("\nWARNINGS:")
+        for warning in validation['warnings']:
+            print(f"  ⚠ {warning}")
+    
+    if 'fitness' in validation:
+        print("\nFITNESS:")
+        f1, f2, c1, c2 = validation['fitness']
+        print(f"  J1 (Communication): {f1:.6f}")
+        print(f"  J2 (Infrastructure): {f2:.6f}")
+        print(f"  Rover constraint: {c1:.6f}")
+        print(f"  Satellite constraint: {c2:.6f}")
+        print(f"  Feasible: {'✓ YES' if validation.get('feasible', False) else '✗ NO'}")
+    
+    print("="*60 + "\n")
