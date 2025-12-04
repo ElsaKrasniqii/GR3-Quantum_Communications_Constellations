@@ -1,4 +1,3 @@
-      
 #!/usr/bin/env python3
 """
 Quantum Communications Constellations Optimizer
@@ -10,12 +9,13 @@ import sys
 import os
 import argparse
 import time
+
 from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 try:
-   from Optimizer import QuantumCommunicationsOptimizer
+   from optimizer import QuantumCommunicationsOptimizer
    from utils import (
        check_dependencies,
        print_solution_summary,
@@ -30,7 +30,7 @@ except ImportError as e:
    print(f"Import error: {e}")
    print("Please ensure all required files are in the current directory:")
    print("  - constellation_udp.py")
-   print("  - Optimizer.py")
+   print("  - optimizer.py")
    print("  - utils.py")
    IMPORTS_SUCCESSFUL = False
 
@@ -42,7 +42,6 @@ def print_banner():
 ║                     SPOC-2 Challenge                         ║
 ╚══════════════════════════════════════════════════════════════╝
    """
-   print(banner)
 
 def check_environment():
    """Check if the environment is properly set up"""
@@ -221,7 +220,7 @@ def analyze_solution_file(args):
                   
                    if not args.batch:
                        import matplotlib.pyplot as plt
-                       from Optimizer import QuantumCommunicationsOptimizer
+                       from optimizer import QuantumCommunicationsOptimizer
                       
                        optimizer = QuantumCommunicationsOptimizer()
                        optimizer.best_solutions = [sol]
@@ -300,7 +299,7 @@ def run_quick_test(args):
   
    print("\n3. Testing optimizer...")
    try:
-       from Optimizer import QuantumCommunicationsOptimizer
+       from optimizer import QuantumCommunicationsOptimizer
        optimizer = QuantumCommunicationsOptimizer(population_size=5, generations=2)
        print("    Optimizer instantiated successfully")
    except Exception as e:
