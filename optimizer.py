@@ -4,7 +4,17 @@ import matplotlib.pyplot as plt
 import json
 
 from datetime import datetime
+import warnings
+warnings.filterwarnings('ignore')
 
+
+try:
+   import pygmo as pg
+   PYGMO_AVAILABLE = True
+except ImportError:
+   PYGMO_AVAILABLE = False
+   print("Pygmo not available - optimization disabled")
+   print("Install with: pip install pygmo")
 
 
 try:
