@@ -459,10 +459,10 @@ class QuantumCommunicationsOptimizer:
 # MAIN EXECUTION (if run directly)
 # -------------------------------------------------------------
 if __name__ == "__main__":
-    # Run test if file is executed directly
-    success = QuantumCommunicationsOptimizer.run_test()
-    
-    if success:
-        print("\nOptimizer is working correctly!")
-    else:
-        print("\nOptimizer test failed. Check the error messages above.")
+   # Test with smaller parameters for quick demo
+   optimizer = run_optimization_demo(population_size=20, generations=30) # type: ignore
+
+
+  
+
+

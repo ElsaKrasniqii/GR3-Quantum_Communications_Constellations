@@ -2,6 +2,8 @@ import numpy as np
 import json
 from datetime import datetime
 import warnings
+
+from udp.udp_spoc2 import combine_scores
 warnings.filterwarnings("ignore")
 
 # ======================================================================
@@ -576,10 +578,37 @@ def run_quick_test():
 # MAIN (for testing)
 # ======================================================================
 if __name__ == "__main__":
-    print("Testing utilities module...")
-    success = run_quick_test()
-    
-    if success:
-        print("\n✓ All tests passed!")
-    else:
-        print("\n⚠ Some tests failed. Check output above.")
+   print("Testing utility functions...\n")
+  
+   # Check dependencies
+   check_dependencies()
+  
+   # Create a dummy solution for testing
+   dummy_solution = [
+       7000, 0.001, 1.2, 0, 55,  # Walker 1
+       8000, 0.001, 1.2, 0, 15,  # Walker 2
+       10, 2, 1,  # S1, P1, F1
+       10, 2, 1,  # S2, P2, F2
+       13, 21, 34, 55  # Rover indices
+   ]
+  
+   # Print solution summary
+   print_solution_summary(dummy_solution)
+  
+   # Validate solution
+   validation = validate_solution(dummy_solution)
+   print_validation_results(validation)
+  
+   # Test hypervolume calculation
+   test_points = [
+       [0.5, 0.3],
+       [0.6, 0.2],
+       [0.4, 0.4]
+   ]
+  
+   hv_score = combine_scores(test_points)
+   print(f"Hypervolume score for test points: {hv_score:.4f}")
+  
+   print("\nUtility functions test completed!")
+
+
