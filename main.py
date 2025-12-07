@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 """
 Quantum Communications Constellations Optimizer
+<<<<<<< Updated upstream
 ESA SpOC-2 Challenge 
+=======
+ESA SpOC-2 Challenge – Simple Menu Version
+>>>>>>> Stashed changes
 """
 
 import sys
@@ -19,7 +23,11 @@ try:
     from constellation_udp import constellation_udp
     IMPORTS_OK = True
 except Exception as e:
+<<<<<<< Updated upstream
     print(f" Import error: {e}")
+=======
+    print(f"❌ Import error: {e}")
+>>>>>>> Stashed changes
     IMPORTS_OK = False
 
 
@@ -72,11 +80,19 @@ def run_full_optimization():
         sols = optimizer.optimize(verbose=True)
 
         if not sols:
+<<<<<<< Updated upstream
             print(" No solutions found.")
             return
 
         elapsed = time.time() - start
         print(f"\nOptimization completed in {elapsed:.2f} seconds")
+=======
+            print("❌ No solutions found.")
+            return
+
+        elapsed = time.time() - start
+        print(f"\n✅ Optimization completed in {elapsed:.2f} seconds")
+>>>>>>> Stashed changes
         print(f"   Found {len(sols)} Pareto-optimal solutions\n")
 
         # Show top solutions
@@ -89,6 +105,7 @@ def run_full_optimization():
             print("⚠ Could not generate plot")
 
         # Create submission file
+<<<<<<< Updated upstream
         print("\n Creating submission file...")
         optimizer.create_submission("submission.json")
 
@@ -97,6 +114,16 @@ def run_full_optimization():
 
     except Exception as e:
         print(f"\n OPTIMIZATION FAILED: {e}")
+=======
+        print("\n💾 Creating submission file...")
+        optimizer.create_submission("submission.json")
+
+        print("\n🎉 OPTIMIZATION FINISHED!")
+        print("   Submission file: submission.json\n")
+
+    except Exception as e:
+        print(f"\n❌ OPTIMIZATION FAILED: {e}")
+>>>>>>> Stashed changes
 
 
 # ==========================================================
@@ -111,11 +138,19 @@ def run_example_analysis():
         udp = constellation_udp()
         x = udp.example()
 
+<<<<<<< Updated upstream
         print(" Example solution loaded successfully!")
         print_solution_summary(x, udp)
 
     except Exception as e:
         print(f" Example analysis failed: {e}")
+=======
+        print("🔧 Example solution loaded successfully!")
+        print_solution_summary(x, udp)
+
+    except Exception as e:
+        print(f"❌ Example analysis failed: {e}")
+>>>>>>> Stashed changes
 
 
 # ==========================================================
@@ -132,17 +167,26 @@ def run_quick_test():
         # Test 1: UDP
         print("1. Testing constellation_udp...")
         udp = constellation_udp()
+<<<<<<< Updated upstream
         print("    constellation_udp loaded")
+=======
+        print("   ✅ constellation_udp loaded")
+>>>>>>> Stashed changes
         
         # Test 2: Example
         print("\n2. Testing example solution...")
         x = udp.example()
         fitness = udp.fitness(x)
+<<<<<<< Updated upstream
         print(f"    Example fitness: {fitness}")
+=======
+        print(f"   ✅ Example fitness: {fitness}")
+>>>>>>> Stashed changes
         
         # Test 3: Optimizer
         print("\n3. Testing optimizer...")
         optimizer = QuantumCommunicationsOptimizer(10, 5)
+<<<<<<< Updated upstream
         print("    Optimizer created")
         
         print("\n" + "="*60)
@@ -151,6 +195,16 @@ def run_quick_test():
         
     except Exception as e:
         print(f"\n TEST FAILED: {e}")
+=======
+        print("   ✅ Optimizer created")
+        
+        print("\n" + "="*60)
+        print("✅ ALL TESTS PASSED!")
+        print("="*60)
+        
+    except Exception as e:
+        print(f"\n❌ TEST FAILED: {e}")
+>>>>>>> Stashed changes
 
 
 # ==========================================================
@@ -177,11 +231,19 @@ def main_menu():
             run_quick_test()
         elif choice == "4":
             print("\n" + "="*60)
+<<<<<<< Updated upstream
             print("Goodbye!")
             print("="*60 + "\n")
             break
         else:
             print(" Invalid option. Please choose 1-4.")
+=======
+            print("Goodbye! 👋")
+            print("="*60 + "\n")
+            break
+        else:
+            print("❌ Invalid option. Please choose 1-4.")
+>>>>>>> Stashed changes
 
 
 # ==========================================================
@@ -191,7 +253,11 @@ def main():
     print_banner()
 
     if not IMPORTS_OK:
+<<<<<<< Updated upstream
         print(" Fix import errors first.")
+=======
+        print("❌ Fix import errors first.")
+>>>>>>> Stashed changes
         print("\nRequired packages:")
         print("  numpy, scipy, pykep, sgp4, networkx, pygmo, matplotlib")
         return
