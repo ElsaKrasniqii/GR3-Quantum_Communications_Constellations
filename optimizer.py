@@ -6,17 +6,19 @@ import json
 from datetime import datetime
 
 import warnings
-import numpy as np
+import time
+
+
 warnings.filterwarnings('ignore')
 
 
 try:
-   import pygmo as pg
-   PYGMO_AVAILABLE = True
+    import pygmo as pg
+    PYGMO_AVAILABLE = True
 except ImportError:
-   PYGMO_AVAILABLE = False
-   print("Pygmo not available - optimization disabled")
-   print("Install with: pip install pygmo")
+    PYGMO_AVAILABLE = False
+    print("Pygmo not available - optimization disabled")
+    print("Install with: pip install pygmo")
 
 
 try:
@@ -28,24 +30,22 @@ except Exception as e:
 class QuantumCommunicationsOptimizer:
 
     def __init__(self, population_size=48, generations=100, random_seed=42, use_multithreading=False):
-        # ============================================
-        # FIKSU: Sigurohu që popullsia plotëson kërkesat e NSGA-II
-        # ============================================
+        # Sigurohu që popullsia plotëson kërkesat e NSGA-II
         original_size = population_size
         
         # Kërkesat e NSGA-II:
         # 1. Të paktën 5 individë
         # 2. Shumëfish i 4
         if population_size < 5:
-            population_size = 8  # Minimumi i sigurt
+            population_size = 8
             print(f"⚠ Warning: Population too small ({original_size}). Increased to {population_size}.")
         
+
         if population_size % 4 != 0:
-            # Rrumbullakso në shumëfishin më të afërt të 4
+
             population_size = ((population_size + 3) // 4) * 4
             print(f"⚠ Warning: Population {original_size} adjusted to {population_size} (must be multiple of 4).")
-        # ============================================
-        
+
         self.population = population_size
         self.generations = generations
         self.seed = random_seed
@@ -55,14 +55,31 @@ class QuantumCommunicationsOptimizer:
         self.best_solutions = []
         np.random.seed(self.seed)
 
-    # -------------------------------------------------------------
-    # MAIN OPTIMIZATION FUNCTION (NSGA-II ONLY)
-    # -------------------------------------------------------------
-    def optimize(self, verbose=True):
-        # Krijo problemin PARË
-        prob = pg.problem(self.udp)
+    def _add_heuristic_solutions(self, pop):
+        """Add heuristic solutions to the initial population."""
+        try:
+            example_sol = self.udp.example()
+            bounds = self.udp.get_bounds()
+            lower = np.array(bounds[0])
+            upper = np.array(bounds[1])
+            
+            if len(example_sol) == len(lower):
+                pop.set_x(0, example_sol)
+            
+            for i in range(1, min(5, len(pop))):
+                random_sol = lower + np.random.random(len(lower)) * (upper - lower)
+                pop.set_x(i, random_sol)
+                
+        except Exception as e:
+            if len(pop) > 0:
+                print(f"Warning: Could not add heuristic solutions: {e}")
         
-        # Printo TË GJITHA informacionet NJË HERË
+        return pop
+
+    def optimize(self, verbose=True):
+        # Krijo problemin
+        prob = pg.problem(self.udp)
+
         if verbose:
             print("\n" + "="*60)
             print("          RUNNING OPTIMIZATION WITH NSGA-II")
@@ -77,7 +94,7 @@ class QuantumCommunicationsOptimizer:
             print(f"Dimension: {prob.get_nx()}")
             print("-"*60)
         
-        # Krijo algoritmin NSGA-II
+        # Krijo algoritmin
         algo = pg.algorithm(
             pg.nsga2(
                 gen=self.generations,
@@ -87,43 +104,44 @@ class QuantumCommunicationsOptimizer:
                 eta_m=20
             )
         )
-        
-        # Aktivo output nga algoritmi
+
         if verbose:
             algo.set_verbosity(1)
         
-        # Krijo popullatën fillestare
+
         pop = pg.population(prob, size=self.population, seed=self.seed)
-        
-        # Shto zgjidhje heuristike
+
         pop = self._add_heuristic_solutions(pop)
-        
-        # Ekzekuto optimizimin
+
+        fitness_history = {"generation": [], "best_J1": [], "best_J2": [], "avg_J1": [], "avg_J2": []}
+
         if verbose:
             print("\nStarting evolution...")
             print("-" * 50)
-        
+
+        # Ekzekuto optimizimin
         pop = algo.evolve(pop)
         
         # Nxjerr rezultatet
         fits = pop.get_f()
         xs = pop.get_x()
+
+        # Merr frontin Pareto
+        try:
+            if fits.shape[1] == 2:
+                front = pg.non_dominated_front_2d(fits)
+            else:
+                front = pg.non_dominated_front(fits)
+        except:
+            front = list(range(len(fits)))
         
-        if verbose:
-            print(f"\n✅ Optimization completed!")
-            print(f"Final population size: {len(fits)}")
-            print(f"Fitness shape: {fits.shape}")
-        
-        # Merr frontin jo-dominuar (Pareto front)
-        front = pg.non_dominated_front_2d(fits)
-        
-        # Nxjerr zgjidhjet Pareto
+        # Nxjerr zgjidhjet
         sols = []
         for idx in front:
             f = fits[idx]
             x = xs[idx]
             
-            # Analizo constraints (duke përdorur metodën utility)
+
             try:
                 analysis = self.udp.analyze_solution(x)
                 rover_violated = analysis['constraints']['rover_violated']
@@ -136,81 +154,211 @@ class QuantumCommunicationsOptimizer:
                     'rover_violated': rover_violated,
                     'sat_violated': sat_violated
                 }
-            except:
-                # Fallback nëse analiza dështon
+            except Exception as e:
                 feasible = True
                 constraint_info = {}
-            
+
+            try:
+                crowding_distance = float(pop.get_cd()[idx])
+            except:
+                crowding_distance = 0.0
+
             sols.append({
                 "x": x,
-                "fitness": [float(f[0]), float(f[1])],  # f1 dhe f2 vetëm
+                "fitness": [float(f[0]), float(f[1])],
                 "feasible": feasible,
                 "constraint_info": constraint_info,
-                "crowding_distance": float(pop.get_cd()[idx]) if hasattr(pop, 'get_cd') else 0.0
+                "crowding_distance": crowding_distance,
+                "pareto_optimal": True
             })
-        
-        # Rendit sipas objektivit të parë (J1)
+
+        # Shto diversitet
+        if len(sols) < 10:
+            for idx in range(len(fits)):
+                if idx not in front:
+                    f = fits[idx]
+                    x = xs[idx]
+                    
+                    try:
+                        analysis = self.udp.analyze_solution(x)
+                        rover_violated = analysis['constraints']['rover_violated']
+                        sat_violated = analysis['constraints']['sat_violated']
+                        feasible = not (rover_violated or sat_violated)
+                        
+                        constraint_info = {
+                            'rover_distance': analysis['distances']['rover_distance'],
+                            'satellite_distance': analysis['distances']['satellite_distance'],
+                            'rover_violated': rover_violated,
+                            'sat_violated': sat_violated
+                        }
+                    except:
+                        feasible = True
+                        constraint_info = {}
+
+                    sols.append({
+                        "x": x,
+                        "fitness": [float(f[0]), float(f[1])],
+                        "feasible": feasible,
+                        "constraint_info": constraint_info,
+                        "crowding_distance": 0.0,
+                        "pareto_optimal": False
+                    })
+
+                    if len(sols) >= 20:
+                        break
+
+        # Rendit dhe ruaj
         sols.sort(key=lambda s: s["fitness"][0])
         self.best_solutions = sols
-        
+
         if verbose and sols:
-            print(f"\nFound {len(sols)} Pareto-optimal solutions.")
-            print(f"Best J1: {sols[0]['fitness'][0]:.6f}")
-            print(f"Best J2: {sols[-1]['fitness'][1]:.6f}")
+            pareto_count = len([s for s in sols if s['pareto_optimal']])
+            print(f"\nFound {pareto_count} Pareto-optimal solutions.")
+            print(f"Total solutions: {len(sols)}")
+            
+            if pareto_count > 0:
+                pareto_solutions = [s for s in sols if s['pareto_optimal']]
+                print(f"Best J1: {min(s['fitness'][0] for s in pareto_solutions):.6f}")
+                print(f"Best J2: {min(s['fitness'][1] for s in pareto_solutions):.6f}")
+
+        # Ruaj në file
+        self.save_solutions_to_json(sols)
+
+        # Vizualizo
+        self.plot_fitness_progress(fitness_history)
+        self.plot_pareto_front()
+
+        print("\n✅ Optimization complete! Solutions saved to 'solutions.json'.")
         
         return sols
 
-    # -------------------------------------------------------------
-    # ADD HEURISTIC SOLUTIONS
-    # -------------------------------------------------------------
-    def _add_heuristic_solutions(self, pop):
-        """Add heuristic solutions to the initial population."""
-        try:
-            # Get example solution from UDP
-            example_sol = self.udp.example()
-            
-            # Get bounds
-            bounds = self.udp.get_bounds()
-            lower = np.array(bounds[0])
-            upper = np.array(bounds[1])
-            
-            # Add example solution
-            if len(example_sol) == len(lower):
-                pop.set_x(0, example_sol)
-            
-            # Add some random but bounded solutions
-            for i in range(1, min(5, len(pop))):
-                random_sol = lower + np.random.random(len(lower)) * (upper - lower)
-                pop.set_x(i, random_sol)
-                
-        except Exception as e:
-            if len(pop) > 0:  # Print vetëm nëse kemi një popullatë
-                print(f"Warning: Could not add heuristic solutions: {e}")
+    def plot_fitness_progress(self, fitness_history):
+        """Plot fitness progress over generations."""
+        if not fitness_history["generation"]:
+            return
         
-        return pop
+        fig, axes = plt.subplots(2, 1, figsize=(10, 8))
+        
+        # Plot J1 progress
+        axes[0].plot(fitness_history["generation"], fitness_history["best_J1"], 'b-', label='Best J1', linewidth=2)
+        axes[0].plot(fitness_history["generation"], fitness_history["avg_J1"], 'b--', label='Avg J1', alpha=0.7)
+        axes[0].set_xlabel('Generation')
+        axes[0].set_ylabel('J1 - Communication Cost')
+        axes[0].set_title('J1 Progress Over Generations')
+        axes[0].legend()
+        axes[0].grid(True, alpha=0.3)
+        
+        # Plot J2 progress
+        axes[1].plot(fitness_history["generation"], fitness_history["best_J2"], 'r-', label='Best J2', linewidth=2)
+        axes[1].plot(fitness_history["generation"], fitness_history["avg_J2"], 'r--', label='Avg J2', alpha=0.7)
+        axes[1].set_xlabel('Generation')
+        axes[1].set_ylabel('J2 - Infrastructure Cost')
+        axes[1].set_title('J2 Progress Over Generations')
+        axes[1].legend()
+        axes[1].grid(True, alpha=0.3)
+        
+        plt.tight_layout()
+        plt.show()
 
-    # -------------------------------------------------------------
-    # SOLUTION ANALYSIS
-    # -------------------------------------------------------------
+    def plot_pareto_front(self):
+        """Plot Pareto front."""
+        if not self.best_solutions:
+            print("No solutions to plot.")
+            return
+
+        # Kategorizo
+        pareto_feasible = [s for s in self.best_solutions if s["feasible"] and s.get("pareto_optimal", False)]
+        non_pareto_feasible = [s for s in self.best_solutions if s["feasible"] and not s.get("pareto_optimal", False)]
+        infeasible = [s for s in self.best_solutions if not s["feasible"]]
+        
+        fig, ax = plt.subplots(figsize=(10, 7))
+        
+        # Plot
+        if infeasible:
+            infeas_f1 = [s["fitness"][0] for s in infeasible]
+            infeas_f2 = [s["fitness"][1] for s in infeasible]
+            ax.scatter(infeas_f1, infeas_f2, c="red", alpha=0.2, label=f'Infeasible ({len(infeasible)})', marker='x')
+        
+        if non_pareto_feasible:
+            non_pareto_f1 = [s["fitness"][0] for s in non_pareto_feasible]
+            non_pareto_f2 = [s["fitness"][1] for s in non_pareto_feasible]
+            ax.scatter(non_pareto_f1, non_pareto_f2, c="blue", alpha=0.4, label=f'Feasible non-Pareto ({len(non_pareto_feasible)})')
+        
+        if pareto_feasible:
+            pareto_f1 = [s["fitness"][0] for s in pareto_feasible]
+            pareto_f2 = [s["fitness"][1] for s in pareto_feasible]
+            
+            ax.scatter(pareto_f1, pareto_f2, c="green", edgecolor="black", s=80, label=f'Pareto-optimal ({len(pareto_feasible)})', zorder=5)
+            
+            if len(pareto_f1) > 1:
+                sorted_indices = np.argsort(pareto_f1)
+                ax.plot([pareto_f1[i] for i in sorted_indices], 
+                       [pareto_f2[i] for i in sorted_indices], 'g--', alpha=0.7, linewidth=2, zorder=4)
+        
+        ax.set_xlabel('J1 – Communication Cost')
+        ax.set_ylabel('J2 – Infrastructure Cost')
+        ax.set_title(f'Pareto Front\nPopulation: {self.population}, Generations: {self.generations}')
+        ax.legend()
+        ax.grid(True, alpha=0.3)
+        plt.tight_layout()
+        plt.show()
+
+    def save_solutions_to_json(self, solutions, filename="solutions.json"):
+        """Save solutions to JSON file."""
+        try:
+            solutions_json = []
+            for sol in solutions:
+                solutions_json.append({
+                    "fitness": sol["fitness"],
+                    "feasible": sol["feasible"],
+                    "crowding_distance": sol["crowding_distance"],
+                    "constraint_info": sol["constraint_info"],
+                    "x": sol["x"].tolist()
+                })
+            
+            with open(filename, "w") as f:
+                json.dump({
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "optimizer": "QuantumCommunicationsOptimizer",
+                    "parameters": {
+                        "population": self.population,
+                        "generations": self.generations,
+                        "seed": self.seed
+                    },
+                    "statistics": {
+                        "total_solutions": len(solutions),
+                        "pareto_optimal": len([s for s in solutions if s["pareto_optimal"]]),
+                        "feasible": len([s for s in solutions if s["feasible"]]),
+                        "submitted": len(solutions_json)
+                    },
+                    "solutions": solutions_json
+                }, f, indent=2)
+
+            print(f"\n✓ Solutions saved to {filename}")
+        except Exception as e:
+            print(f"✗ Error saving solutions: {e}")
+
     def analyze_solutions(self, show_top=10):
+        """Analyze and display solutions."""
         if not self.best_solutions:
             print("No solutions available. Run optimize() first.")
             return
 
         print(f"\n=== SOLUTION ANALYSIS (showing top {show_top}) ===")
         
-        # Separate feasible and infeasible
+
         feasible = [s for s in self.best_solutions if s["feasible"]]
         infeasible = [s for s in self.best_solutions if not s["feasible"]]
         
-        print(f"Total Pareto solutions: {len(self.best_solutions)}")
+        print(f"Total solutions: {len(self.best_solutions)}")
         print(f"Feasible solutions: {len(feasible)}")
         print(f"Infeasible solutions: {len(infeasible)}")
         
         if feasible:
             print("\n--- TOP FEASIBLE SOLUTIONS ---")
             for i, sol in enumerate(feasible[:show_top]):
-                print(f"\nSolution #{i+1} (Feasible)")
+                pareto_label = "(Pareto-optimal)" if sol.get("pareto_optimal", False) else ""
+                print(f"\nSolution #{i+1} {pareto_label}")
                 print(f"  J1 (Communication cost): {sol['fitness'][0]:.6f}")
                 print(f"  J2 (Infrastructure cost): {sol['fitness'][1]:.6f}")
                 print(f"  Crowding distance: {sol['crowding_distance']:.6f}")
@@ -219,250 +367,51 @@ class QuantumCommunicationsOptimizer:
                     info = sol['constraint_info']
                     print(f"  Rover distance: {info.get('rover_distance', 'N/A'):.2f} km")
                     print(f"  Satellite distance: {info.get('satellite_distance', 'N/A'):.2f} km")
-        
-        if infeasible and len(feasible) < show_top:
-            print(f"\n--- TOP INFEASIBLE SOLUTIONS (for reference) ---")
-            for i, sol in enumerate(infeasible[:min(show_top-len(feasible), len(infeasible))]):
-                print(f"\nSolution #{i+1+len(feasible)} (INFEASIBLE)")
-                print(f"  J1: {sol['fitness'][0]:.6f}")
-                print(f"  J2: {sol['fitness'][1]:.6f}")
-                if 'constraint_info' in sol:
-                    info = sol['constraint_info']
-                    print(f"  Rover violated: {info.get('rover_violated', 'N/A')}")
-                    print(f"  Satellite violated: {info.get('sat_violated', 'N/A')}")
 
-    # -------------------------------------------------------------
-    # DETAILED ANALYSIS
-    # -------------------------------------------------------------
-    def detailed_analysis(self, idx=0):
-        if not self.best_solutions:
-            print("No solutions available.")
-            return
-
-        if idx >= len(self.best_solutions):
-            print(f"Index {idx} out of range. Available: 0-{len(self.best_solutions)-1}")
-            return
-
-        sol = self.best_solutions[idx]
-        
-        print(f"\n=== DETAILED ANALYSIS OF SOLUTION #{idx+1} ===")
-        print(f"Feasible: {sol['feasible']}")
-        print(f"Fitness J1: {sol['fitness'][0]:.6f}")
-        print(f"Fitness J2: {sol['fitness'][1]:.6f}")
-        print(f"Crowding distance: {sol['crowding_distance']:.6f}")
-        
-        # Show constraint information
-        if 'constraint_info' in sol and sol['constraint_info']:
-            info = sol['constraint_info']
-            print("\nConstraint Information:")
-            print(f"  Rover distance: {info.get('rover_distance', 'N/A'):.2f} km")
-            print(f"  Satellite distance: {info.get('satellite_distance', 'N/A'):.2f} km")
-            print(f"  Rover violated: {info.get('rover_violated', 'N/A')}")
-            print(f"  Satellite violated: {info.get('sat_violated', 'N/A')}")
-        
-        # Analyze with UDP's analysis method
-        try:
-            udp_analysis = self.udp.analyze_solution(sol['x'])
-            print("\nUDP Analysis:")
-            print(f"  Walker 1: {udp_analysis['walker1']['satellites']} satellites")
-            print(f"  Walker 2: {udp_analysis['walker2']['satellites']} satellites")
-            print(f"  Total satellites: {udp_analysis['walker1']['satellites'] + udp_analysis['walker2']['satellites']}")
-            print(f"  Fitness without penalty: {[f'{val:.6f}' for val in udp_analysis['fitness']['without_penalty']]}")
-        except Exception as e:
-            print(f"\nCould not perform detailed UDP analysis: {e}")
-
-    # -------------------------------------------------------------
-    # PLOT PARETO FRONT
-    # -------------------------------------------------------------
-    def plot_pareto_front(self, save_path=None):
-        if not self.best_solutions:
-            print("No solutions to plot.")
-            return
-
-        # Separate feasible and infeasible
-        feas_f1 = [s["fitness"][0] for s in self.best_solutions if s["feasible"]]
-        feas_f2 = [s["fitness"][1] for s in self.best_solutions if s["feasible"]]
-        
-        infeas_f1 = [s["fitness"][0] for s in self.best_solutions if not s["feasible"]]
-        infeas_f2 = [s["fitness"][1] for s in self.best_solutions if not s["feasible"]]
-
-        plt.figure(figsize=(10, 7))
-        
-        # Plot infeasible first (in background)
-        if infeas_f1 and infeas_f2:
-            plt.scatter(infeas_f1, infeas_f2, c="red", alpha=0.3, 
-                       label=f"Infeasible ({len(infeas_f1)})", marker='x', s=50)
-        
-        # Plot feasible on top
-        if feas_f1 and feas_f2:
-            plt.scatter(feas_f1, feas_f2, c="green", edgecolor="black", 
-                       label=f"Feasible ({len(feas_f1)})", s=80)
-            
-            # Highlight the best compromise solution (closest to ideal point)
-            if len(feas_f1) > 0:
-                # Ideal point (minimum of both objectives)
-                ideal_f1 = min(feas_f1)
-                ideal_f2 = min(feas_f2)
-                
-                # Find solution closest to ideal point
-                distances = []
-                for i in range(len(feas_f1)):
-                    d = ((feas_f1[i] - ideal_f1) ** 2 + (feas_f2[i] - ideal_f2) ** 2) ** 0.5
-                    distances.append(d)
-                
-                best_idx = np.argmin(distances)
-                plt.scatter(feas_f1[best_idx], feas_f2[best_idx], 
-                          c="gold", s=200, edgecolor="black", 
-                          label="Best Compromise", zorder=5)
-                
-                # Add annotation
-                plt.annotate("Best", 
-                            xy=(feas_f1[best_idx], feas_f2[best_idx]),
-                            xytext=(10, 10), textcoords='offset points',
-                            fontsize=10, fontweight='bold')
-
-        plt.xlabel("J1 – Communication Cost (normalized)", fontsize=12)
-        plt.ylabel("J2 – Infrastructure Cost (normalized)", fontsize=12)
-        plt.title(f"Pareto Front\nPopulation: {self.population}, Generations: {self.generations}", fontsize=14)
-        plt.grid(True, alpha=0.3)
-        plt.legend()
-        plt.tight_layout()
-        
-        if save_path:
-            plt.savefig(save_path, dpi=150)
-            print(f"Plot saved to {save_path}")
-        
-        plt.show()
-
-    # -------------------------------------------------------------
-    # PLOT CONVERGENCE (if algorithm supports it)
-    # -------------------------------------------------------------
-    def plot_convergence(self, log=None):
-        """Plot convergence of the algorithm if log data is available."""
-        # This would require capturing log data during optimization
-        # For now, it's a placeholder
-        print("Convergence plotting requires logging data capture.")
-        print("Consider implementing logging in the optimize() method.")
-
-    # -------------------------------------------------------------
-    # CREATE SUBMISSION FILE
-    # -------------------------------------------------------------
-    def create_submission(self, filename="submission.json", top_n=20):
-        if not self.best_solutions:
-            print("No solutions to save.")
-            return
-
-        # Take top feasible solutions, or all if none feasible
-        feasible = [s for s in self.best_solutions if s["feasible"]]
-        if not feasible:
-            print("Warning: No feasible solutions. Using best infeasible solutions.")
-            feasible = self.best_solutions
-
-        # Sort by J1 (communication cost)
-        feasible = sorted(feasible, key=lambda s: s["fitness"][0])
-        feasible = feasible[:top_n]
-
-        solutions_json = [s["x"].tolist() for s in feasible]
-
-        out = {
-            "timestamp": datetime.utcnow().isoformat(),
-            "optimizer": "QuantumCommunicationsOptimizer",
-            "parameters": {
-                "population": self.population,
-                "generations": self.generations,
-                "seed": self.seed
-            },
-            "count": len(solutions_json),
-            "dimension": len(solutions_json[0]) if solutions_json else 0,
-            "solutions": solutions_json
-        }
-
-        try:
-            with open(filename, "w") as f:
-                json.dump(out, f, indent=2)
-            print(f"\n✓ Submission saved to {filename}")
-            print(f"  Solutions: {len(solutions_json)}")
-            print(f"  Dimension: {out['dimension']}")
-        except Exception as e:
-            print(f"✗ Error saving submission: {e}")
-
-    # -------------------------------------------------------------
-    # EXPORT SOLUTIONS TO CSV
-    # -------------------------------------------------------------
-    def export_to_csv(self, filename="solutions.csv"):
-        """Export solutions to CSV format."""
-        if not self.best_solutions:
-            print("No solutions to export.")
-            return
-
-        import pandas as pd
-        
-        data = []
-        for i, sol in enumerate(self.best_solutions):
-            row = {
-                'id': i+1,
-                'feasible': sol['feasible'],
-                'J1': sol['fitness'][0],
-                'J2': sol['fitness'][1],
-                'crowding_distance': sol.get('crowding_distance', 0)
-            }
-            
-            # Add decision variables
-            for j, val in enumerate(sol['x']):
-                row[f'x{j}'] = val
-            
-            data.append(row)
-        
-        df = pd.DataFrame(data)
-        df.to_csv(filename, index=False)
-        print(f"Solutions exported to {filename}")
-
-    # -------------------------------------------------------------
-    # TEST FUNCTION
-    # -------------------------------------------------------------
     @staticmethod
     def run_test():
-        """Run a quick test to verify the optimizer works."""
+        """Run a quick test."""
         print("Running quick test...")
-        
+
         try:
-            # Create optimizer with small parameters for quick test
+
             optimizer = QuantumCommunicationsOptimizer(
-                population_size=8,  # 8 është shumëfish i 4
-                generations=10,
+                population_size=8,
+                generations=5,
                 random_seed=42
             )
-            
-            # Run optimization
+
             solutions = optimizer.optimize(verbose=True)
-            
+
             if solutions:
                 print(f"\n✓ Test successful! Found {len(solutions)} solutions.")
-                
-                # Show top 3
-                optimizer.analyze_solutions(show_top=3)
-                
-                # Create test plot
-                optimizer.plot_pareto_front()
-                
+
                 return True
             else:
                 print("✗ Test failed: No solutions found.")
                 return False
-                
+
         except Exception as e:
             print(f"✗ Test failed with error: {e}")
             return False
 
 
-# -------------------------------------------------------------
-# MAIN EXECUTION (if run directly)
-# -------------------------------------------------------------
-if __name__ == "__main__":
-   # Test with smaller parameters for quick demo
-   optimizer = run_optimization_demo(population_size=20, generations=30) # type: ignore
-
-
-  
-
-
+# Funksion për demo
+def run_optimization_demo(population_size=20, generations=30):
+    """Run a demo optimization."""
+    print("=" * 60)
+    print("QUANTUM COMMUNICATIONS OPTIMIZATION DEMO")
+    print("=" * 60)
+    
+    optimizer = QuantumCommunicationsOptimizer(
+        population_size=population_size,
+        generations=generations,
+        random_seed=42
+    )
+    
+    solutions = optimizer.optimize(verbose=True)
+    
+    if solutions:
+        optimizer.analyze_solutions(show_top=10)
+    
+    return optimizer
