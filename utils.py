@@ -607,8 +607,8 @@ if __name__ == "__main__":
    ]
   
    hv_score = combine_scores(test_points)
-   print(f"Hypervolume score for test points: {hv_score:.4f}")
-  
+   print(f"Hypervolume score for test points: {-hv_score:.4f}")
+   
    print("\nUtility functions test completed!")
 
 

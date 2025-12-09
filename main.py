@@ -398,7 +398,7 @@ def main():
     if not IMPORTS_OK:
 
         print("❌ Fix import errors first.")
-
+        
         print("\nRequired packages:")
         print("  numpy, scipy, pykep, sgp4, networkx, pygmo, matplotlib")
         return
