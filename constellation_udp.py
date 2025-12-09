@@ -299,58 +299,67 @@ class constellation_udp:
     def fitness(self, x):
         # Extract parameters
         a1, e1, i1, w1, eta1, a2, e2, i2, w2, eta2, S1, P1, F1, S2, P2, F2, *rv_idx = x
-        
+
         # Convert to integers
         S1, P1, S2, P2 = int(S1), int(P1), int(S2), int(P2)
         N1 = S1 * P1
         N2 = S2 * P2
-        
+
         # Get rover positions
         idx = [int(r) % len(self.lambdas) for r in rv_idx[:4]]
         lamb = self.lambdas[idx]
         phi = self.phis[idx]
         rv = self.rover_positions(lamb, phi)
-        
+
         # Construct constellations
         w1s, w2s = self.construct_walkers(x)
-        
+
         # ============================================================
-        # CALCULATE OBJECTIVES
+        # ✅ OBJECTIVE J1 — REAL COMMUNICATION COST (FIXED)
         # ============================================================
         pos = self.construct_pos(w1s, w2s, rv)
-        
-        f1 = 0  # Average shortest path
+
+        total_link_cost = 0.0
+        total_links = 0
+
         for ep in range(1, self.n_epochs):
             G, adj, _ = self.build_graph(ep, pos[:, ep, :], N1, (eta1, eta2))
-            f1 += self.avg_shortest_path(G, self.n_motherships, self.n_rovers)
-        
-        f1 /= (self.n_epochs - 1)
-        f2 = eta1 * N1 + eta2 * N2  # Total cost
-        
-        # Normalize objectives
-        f1_normalized = f1 / 34
-        f2_normalized = f2 / 100000
-        
+
+            for i in range(adj.shape[0]):
+                for j in range(i):
+                    if adj[i, j] > 0:
+                        total_link_cost += adj[i, j]
+                        total_links += 1
+
+        if total_links > 0:
+            f1 = total_link_cost / total_links
+        else:
+            f1 = 1e4  # Penalitet nëse s'ka lidhje fare
+
         # ============================================================
-        # CALCULATE CONSTRAINT VIOLATIONS AND PENALTIES
+        # ✅ OBJECTIVE J2 — INFRASTRUCTURE COST (UNCHANGED)
+        # ============================================================
+        f2 = eta1 * N1 + eta2 * N2
+
+        # ✅ STABLE NORMALIZATION
+        f1_normalized = f1 / 1000.0
+        f2_normalized = f2 / 100000.0
+
+        # ============================================================
+        # ✅ PENALTY METHOD (UNCHANGED)
         # ============================================================
         penalty = 0.0
-        
-        # 1. Rover distance constraint penalty
+
         rover_distance = self._calculate_rover_distance(lamb, phi)
         if rover_distance < self.min_rover_dist:
             rover_violation = self.min_rover_dist - rover_distance
             penalty += self.PENALTY_ROVER * rover_violation
-        
-        # 2. Satellite distance constraint penalty
+
         sat_distance = self._calculate_satellite_distance(w1s, w2s)
         if sat_distance < self.min_sat_dist:
             sat_violation = self.min_sat_dist - sat_distance
             penalty += self.PENALTY_SAT * sat_violation
-        
-        # ============================================================
-        # RETURN OBJECTIVES WITH PENALTY
-        # ============================================================
+
         return [f1_normalized + penalty, f2_normalized + penalty]
 
 
@@ -358,142 +367,154 @@ class constellation_udp:
     # UTILITY METHODS FOR DEBUGGING AND ANALYSIS
     ###############################################################
     def analyze_solution(self, x):
-        """Analyze a solution and return detailed information."""
-        # Extract parameters
-        a1, e1, i1, w1, eta1, a2, e2, i2, w2, eta2, S1, P1, F1, S2, P2, F2, *rv_idx = x
-        
-        S1, P1, S2, P2 = int(S1), int(P1), int(S2), int(P2)
-        idx = [int(r) % len(self.lambdas) for r in rv_idx[:4]]
-        lamb = self.lambdas[idx]
-        phi = self.phis[idx]
-        
-        # Construct constellations
-        w1s, w2s = self.construct_walkers(x)
-        
-        # Calculate distances
-        rover_distance = self._calculate_rover_distance(lamb, phi)
-        sat_distance = self._calculate_satellite_distance(w1s, w2s)
-        
-        # Check constraint violations
-        rover_violated = rover_distance < self.min_rover_dist
-        sat_violated = sat_distance < self.min_sat_dist
-        
-        # Calculate fitness without penalty (for comparison)
-        fitness_without_penalty = self._fitness_without_penalty(x)
-        
-        return {
-            'walker1': {'S': S1, 'P': P1, 'F': F1, 'satellites': S1 * P1},
-            'walker2': {'S': S2, 'P': P2, 'F': F2, 'satellites': S2 * P2},
-            'rovers': {'indices': idx, 'lambdas': lamb, 'phis': phi},
-            'distances': {
-                'rover_distance': rover_distance,
-                'satellite_distance': sat_distance,
-                'min_rover_dist': self.min_rover_dist,
-                'min_sat_dist': self.min_sat_dist
-            },
-            'constraints': {
-                'rover_violated': rover_violated,
-                'sat_violated': sat_violated,
-                'rover_violation_amount': max(0, self.min_rover_dist - rover_distance),
-                'sat_violation_amount': max(0, self.min_sat_dist - sat_distance)
-            },
-            'fitness': {
-                'without_penalty': fitness_without_penalty,
-                'with_penalty': self.fitness(x)
+            """Analyze a solution and return detailed information."""
+            # Extract parameters
+            a1, e1, i1, w1, eta1, a2, e2, i2, w2, eta2, S1, P1, F1, S2, P2, F2, *rv_idx = x
+            
+            S1, P1, S2, P2 = int(S1), int(P1), int(S2), int(P2)
+            idx = [int(r) % len(self.lambdas) for r in rv_idx[:4]]
+            lamb = self.lambdas[idx]
+            phi = self.phis[idx]
+            
+            # Construct constellations
+            w1s, w2s = self.construct_walkers(x)
+            
+            # Calculate distances
+            rover_distance = self._calculate_rover_distance(lamb, phi)
+            sat_distance = self._calculate_satellite_distance(w1s, w2s)
+            
+            # Check constraint violations
+            rover_violated = rover_distance < self.min_rover_dist
+            sat_violated = sat_distance < self.min_sat_dist
+            
+            # Calculate fitness without penalty (for comparison)
+            fitness_without_penalty = self._fitness_without_penalty(x)
+            
+            return {
+                'walker1': {'S': S1, 'P': P1, 'F': F1, 'satellites': S1 * P1},
+                'walker2': {'S': S2, 'P': P2, 'F': F2, 'satellites': S2 * P2},
+                'rovers': {'indices': idx, 'lambdas': lamb, 'phis': phi},
+                'distances': {
+                    'rover_distance': rover_distance,
+                    'satellite_distance': sat_distance,
+                    'min_rover_dist': self.min_rover_dist,
+                    'min_sat_dist': self.min_sat_dist
+                },
+                'constraints': {
+                    'rover_violated': rover_violated,
+                    'sat_violated': sat_violated,
+                    'rover_violation_amount': max(0, self.min_rover_dist - rover_distance),
+                    'sat_violation_amount': max(0, self.min_sat_dist - sat_distance)
+                },
+                'fitness': {
+                    'without_penalty': fitness_without_penalty,
+                    'with_penalty': self.fitness(x)
+                }
             }
-        }
-    
-    def _fitness_without_penalty(self, x):
-        """Calculate fitness without penalty (for analysis only)."""
-        a1, e1, i1, w1, eta1, a2, e2, i2, w2, eta2, S1, P1, F1, S2, P2, F2, *rv_idx = x
         
+
+    def _fitness_without_penalty(self, x):
+        
+        a1, e1, i1, w1, eta1, a2, e2, i2, w2, eta2, S1, P1, F1, S2, P2, F2, *rv_idx = x
+
         S1, P1, S2, P2 = int(S1), int(P1), int(S2), int(P2)
         N1 = S1 * P1
         N2 = S2 * P2
-        
+
         idx = [int(r) % len(self.lambdas) for r in rv_idx[:4]]
         lamb = self.lambdas[idx]
         phi = self.phis[idx]
         rv = self.rover_positions(lamb, phi)
-        
+
         w1s, w2s = self.construct_walkers(x)
         pos = self.construct_pos(w1s, w2s, rv)
-        
-        f1 = 0
+
+        total_link_cost = 0.0
+        total_links = 0
+
         for ep in range(1, self.n_epochs):
             G, adj, _ = self.build_graph(ep, pos[:, ep, :], N1, (eta1, eta2))
-            f1 += self.avg_shortest_path(G, self.n_motherships, self.n_rovers)
-        
-        f1 /= (self.n_epochs - 1)
+
+            for i in range(adj.shape[0]):
+                for j in range(i):
+                    if adj[i, j] > 0:
+                        total_link_cost += adj[i, j]
+                        total_links += 1
+
+        if total_links > 0:
+            f1 = total_link_cost / total_links
+        else:
+            f1 = 1e4
+
         f2 = eta1 * N1 + eta2 * N2
-        
-        return [f1 / 34, f2 / 100000]
+
+        return [f1 / 1000.0, f2 / 100000.0]
 
 
     ###############################################################
     # EXAMPLE SOLUTION
     ###############################################################
     def example(self):
-        return [
-            7000, 0.001, 1.2, 0, 40,      # Walker 1: a, e, i, w, eta
-            8200, 0.001, 1.2, 0, 30,      # Walker 2: a, e, i, w, eta
-            10, 2, 1,                     # S1, P1, F1
-            8, 3, 1,                      # S2, P2, F2
-            5, 10, 15, 20                 # Rover indices
-        ]
+            return [
+                7000, 0.001, 1.2, 0, 40,      # Walker 1: a, e, i, w, eta
+                8200, 0.001, 1.2, 0, 30,      # Walker 2: a, e, i, w, eta
+                10, 2, 1,                     # S1, P1, F1
+                8, 3, 1,                      # S2, P2, F2
+                5, 10, 15, 20                 # Rover indices
+            ]
 
 
     ###############################################################
     # PLOTTING
     ###############################################################
     def plot(self, x, ep=1):
-        fig = plt.figure(figsize=(8, 8))
-        ax = fig.add_subplot(111, projection='3d')
+            fig = plt.figure(figsize=(8, 8))
+            ax = fig.add_subplot(111, projection='3d')
 
-        w1, w2 = self.construct_walkers(x)
-        rid = [int(r) % len(self.lambdas) for r in x[-4:]]
-        rv = self.rover_positions(self.lambdas[rid], self.phis[rid])
-        pos = self.construct_pos(w1, w2, rv)
+            w1, w2 = self.construct_walkers(x)
+            rid = [int(r) % len(self.lambdas) for r in x[-4:]]
+            rv = self.rover_positions(self.lambdas[rid], self.phis[rid])
+            pos = self.construct_pos(w1, w2, rv)
 
-        # Plot satellites
-        ax.scatter(pos[:, ep, 0], pos[:, ep, 1], pos[:, ep, 2], s=20, c='red', label='Satellites')
-        
-        # Plot motherships (last 3 positions)
-        ax.scatter(pos[-3:, ep, 0], pos[-3:, ep, 1], pos[-3:, ep, 2], s=50, c='blue', marker='^', label='Motherships')
-        
-        # Plot rovers (last 4 positions before motherships)
-        ax.scatter(pos[-7:-3, ep, 0], pos[-7:-3, ep, 1], pos[-7:-3, ep, 2], s=100, c='green', marker='s', label='Rovers')
+            # Plot satellites
+            ax.scatter(pos[:, ep, 0], pos[:, ep, 1], pos[:, ep, 2], s=20, c='red', label='Satellites')
+            
+            # Plot motherships (last 3 positions)
+            ax.scatter(pos[-3:, ep, 0], pos[-3:, ep, 1], pos[-3:, ep, 2], s=50, c='blue', marker='^', label='Motherships')
+            
+            # Plot rovers (last 4 positions before motherships)
+            ax.scatter(pos[-7:-3, ep, 0], pos[-7:-3, ep, 1], pos[-7:-3, ep, 2], s=100, c='green', marker='s', label='Rovers')
 
-        # Plot Earth
-        r = self.Rp
-        u, v = np.mgrid[0:2*np.pi:20j, 0:np.pi:10j]
-        ax.plot_surface(r * np.cos(u) * np.sin(v),
-                        r * np.sin(u) * np.sin(v),
-                        r * np.cos(v),
-                        alpha=0.3, color="blue")
+            # Plot Earth
+            r = self.Rp
+            u, v = np.mgrid[0:2*np.pi:20j, 0:np.pi:10j]
+            ax.plot_surface(r * np.cos(u) * np.sin(v),
+                            r * np.sin(u) * np.sin(v),
+                            r * np.cos(v),
+                            alpha=0.3, color="blue")
 
-        ax.set_xlabel('X (km)')
-        ax.set_ylabel('Y (km)')
-        ax.set_zlabel('Z (km)')
-        ax.set_title(f'Constellation Configuration (Epoch {ep})')
-        ax.legend()
-        
-        # Set equal aspect ratio
-        max_range = np.array([pos[:, ep, 0].max()-pos[:, ep, 0].min(),
-                              pos[:, ep, 1].max()-pos[:, ep, 1].min(),
-                              pos[:, ep, 2].max()-pos[:, ep, 2].min()]).max()
-        mid_x = (pos[:, ep, 0].max()+pos[:, ep, 0].min()) * 0.5
-        mid_y = (pos[:, ep, 1].max()+pos[:, ep, 1].min()) * 0.5
-        mid_z = (pos[:, ep, 2].max()+pos[:, ep, 2].min()) * 0.5
-        ax.set_xlim(mid_x - max_range*0.5, mid_x + max_range*0.5)
-        ax.set_ylim(mid_y - max_range*0.5, mid_y + max_range*0.5)
-        ax.set_zlim(mid_z - max_range*0.5, mid_z + max_range*0.5)
+            ax.set_xlabel('X (km)')
+            ax.set_ylabel('Y (km)')
+            ax.set_zlabel('Z (km)')
+            ax.set_title(f'Constellation Configuration (Epoch {ep})')
+            ax.legend()
+            
+            # Set equal aspect ratio
+            max_range = np.array([pos[:, ep, 0].max()-pos[:, ep, 0].min(),
+                                pos[:, ep, 1].max()-pos[:, ep, 1].min(),
+                                pos[:, ep, 2].max()-pos[:, ep, 2].min()]).max()
+            mid_x = (pos[:, ep, 0].max()+pos[:, ep, 0].min()) * 0.5
+            mid_y = (pos[:, ep, 1].max()+pos[:, ep, 1].min()) * 0.5
+            mid_z = (pos[:, ep, 2].max()+pos[:, ep, 2].min()) * 0.5
+            ax.set_xlim(mid_x - max_range*0.5, mid_x + max_range*0.5)
+            ax.set_ylim(mid_y - max_range*0.5, mid_y + max_range*0.5)
+            ax.set_zlim(mid_z - max_range*0.5, mid_z + max_range*0.5)
 
-        return ax
+            return ax
 
 
-    ###############################################################
-    # STRING REPRESENTATION
-    ###############################################################
+        ###############################################################
+        # STRING REPRESENTATION
+        ###############################################################
     def __str__(self):
-        return "QKD_Constellation_UDP_with_Penalty_Method" 
+            return "QKD_Constellation_UDP_with_Penalty_Method" 
