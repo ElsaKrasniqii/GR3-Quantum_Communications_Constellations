@@ -60,3 +60,36 @@ Lat (rad.)   Lon (rad.)
 9.210033238890864560e-01  1.222549040618014837e+00
 ...
 
+Methods for Fitness Calculation and Hypervolume
+
+Fitness for each decision vector is calculated as a multi-objective function:
+
+fitness = [Q1, Q2]
+
+
+Where:
+
+Q1: The average shortest communication path cost.
+
+Q2: The total operational cost of the satellites.
+
+The hypervolume is used to evaluate the quality of the Pareto frontier. The reference point for the hypervolume is [1.2, 1.4], and the hypervolume value is multiplied by 10,000. Only solutions with Q1 less than 1.2 and Q2 less than 1.4 will contribute to the hypervolume.
+
+Dependencies
+
+This project requires several libraries and dependencies for calculations and optimizations:
+
+NumPy: For numerical operations.
+
+SciPy: For scientific computing.
+
+PyKEP: For astrodynamics.
+
+PyGMO: For optimization and hypervolume calculations.
+
+Matplotlib: For plotting results.
+
+Make sure to install these dependencies before running the code:
+
+pip install numpy scipy pygmo matplotlib pykep
+
