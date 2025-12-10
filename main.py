@@ -52,13 +52,13 @@ def print_top_solutions_detailed(solutions, show_top=10):
     print("="*60)
     
     # Kategorizo zgjidhjet
-    feasible_solutions = [s for s in solutions if s.get("feasible", False)]
+    #feasible_solutions = [s for s in solutions if s.get("feasible", False)]
     pareto_solutions = [s for s in solutions if s.get("pareto_optimal", False)]
     
     print(f"Total Solutions: {len(solutions)}")
     print(f"Pareto-Optimal: {len(pareto_solutions)}")
-    print(f"Feasible: {len(feasible_solutions)}")
-    print(f"Infeasible: {len(solutions) - len(feasible_solutions)}")
+    #print(f"Feasible: {len(feasible_solutions)}")
+    #print(f"Infeasible: {len(solutions) - len(feasible_solutions)}")
     
     # Rendit sipas J1 (Communication Cost)
     sorted_solutions = sorted(solutions, key=lambda s: s["fitness"][0])
@@ -71,10 +71,10 @@ def print_top_solutions_detailed(solutions, show_top=10):
         
         # Status indicators
         status = []
-        if sol.get("feasible", False):
-            status.append("✅ FEASIBLE")
-        else:
-            status.append("❌ INFEASIBLE")
+        #if sol.get("feasible", False):
+         #   status.append("✅ FEASIBLE")
+        #else:
+         #   status.append("❌ INFEASIBLE")
         
         if sol.get("pareto_optimal", False):
             status.append("⭐ PARETO-OPTIMAL")
@@ -169,106 +169,13 @@ def run_full_optimization():
         print(f"\n✅ Optimization completed in {elapsed:.2f} seconds")
         print(f"   Found {len(sols)} Pareto-optimal solutions\n")
 
-        # Show top solutions (ensure this shows top 10 solutions)
-        optimizer.analyze_solutions(show_top=10)  # Ensure we are showing top 10 solutions, not just 1
-
-        # Plot Pareto front (visualizimi i rezultateve)
-        try:
-            print("📊 Plotting Pareto front...")
-            optimizer.plot_pareto_front()  # This will visualize the Pareto front for the solutions
-        except:
-            print("⚠ Could not generate plot")
-
-        # Create submission file
-        print("\n💾 Creating submission file...")
-        optimizer.create_submission("submission.json")
-
-        print("\n🎉 OPTIMIZATION FINISHED!")
-        print("   Submission file: submission.json\n")
-
-    except Exception as e:
-        print(f"\n❌ OPTIMIZATION FAILED: {e}")
-
-
-    print("\n" + "="*60)
-    print("                 FULL OPTIMIZATION")
-    print("="*60)
-
-    # Get parameters with defaults
-    print("\nEnter optimization parameters:")
-    try:
-        pop = int(input("Population size [50]: ") or 50)
-        gen = int(input("Generations [100]: ") or 100)
-        seed = int(input("Random seed [42]: ") or 42)
-    except ValueError:
-        print("⚠ Invalid input! Using defaults...")
-        pop, gen, seed = 50, 100, 42
-
-    print(f"\nStarting optimization with:")
-    print(f"  Population: {pop}")
-    print(f"  Generations: {gen}")
-    print(f"  Seed: {seed}")
-    print("-"*60)
-
-    start = time.time()
-
-    try:
-        optimizer = QuantumCommunicationsOptimizer(
-            population_size=pop,
-            generations=gen,
-            random_seed=seed
-        )
-
-        # Run optimization
-        sols = optimizer.optimize(verbose=True)
-
-      
-        if not sols:
-      
-            print("❌ No solutions found.")
-      
-            return
-
-        elapsed = time.time() - start
-        print(f"\n✅ Optimization completed in {elapsed:.2f} seconds")
-        print(f"   Found {len(sols)} solutions total")
-        
-        # Show top 10 solutions
-        print_top_solutions_detailed(sols, show_top=10)  # Show detailed top 10 solutions
-        
-        # Count Pareto solutions
-        pareto_count = len([s for s in sols if s.get("pareto_optimal", False)])
-        print(f"   Pareto-optimal solutions: {pareto_count}")
-
-        # Also use optimizer's built-in analysis
-        print("\n" + "="*60)
-        print("          OPTIMIZER'S ANALYSIS")
-        print("="*60)
+        # ✅ SHFAQ VETËM TOP 10 SOLUTIONS
         optimizer.analyze_solutions(show_top=10)
 
-        # Plot Pareto front
-        try:
-            print("\n📊 Plotting Pareto front...")
-            optimizer.plot_pareto_front()
-        except Exception as e:
-            print(f"⚠ Could not generate plot: {e}")
-
-        # Create submission file
-      
-        print("\n💾 Creating submission file...")
-      
-        optimizer.create_submission("submission.json")
-
-        print("\n🎉 OPTIMIZATION FINISHED!")
-        print("   Files created:")
-        print("   - submission.json (for submission)")
+        print("\n🎉 OPTIMIZATION FINISHED SUCCESSFULLY!")
 
     except Exception as e:
-      
         print(f"\n❌ OPTIMIZATION FAILED: {e}")
-        import traceback
-        traceback.print_exc()
-
 # ==========================================================
 # EXAMPLE ANALYSIS
 # ==========================================================
