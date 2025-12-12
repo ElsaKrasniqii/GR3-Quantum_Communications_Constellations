@@ -15,43 +15,43 @@ def compute_hypervolume_score(points, ref_point=None):
     Returns a negative value (lower is better).
     """
     try:
-        # Try to use pygmo for accurate hypervolume
+        
         import pygmo as pg
         
         pts = np.array(points)
         
-        # Check input validity
+        
         if pts.ndim != 2 or pts.shape[1] < 2:
             return 0.0
             
-        # Use first 2 objectives only
+       
         pts_2d = pts[:, :2]
         
-        # Remove invalid points
+        
         valid_mask = ~(np.any(np.isnan(pts_2d), axis=1) | np.any(np.isinf(pts_2d), axis=1))
         pts_2d = pts_2d[valid_mask]
         
         if len(pts_2d) < 2:
-            # Fallback for few points
+            
             if len(pts_2d) == 1:
                 return -float(np.sum(pts_2d[0]))
             return 0.0
         
-        # Set reference point if not provided
+        
         if ref_point is None:
-            ref_point = np.array([1.5, 1.5])  # Conservative reference
+            ref_point = np.array([1.5, 1.5])  
         
         try:
             hv = pg.hypervolume(pts_2d)
             hv_value = hv.compute(ref_point)
-            return -hv_value  # Negative because we minimize
+            return -hv_value  
         except Exception as e:
-            # Fallback to simple approximation
+            
             print(f"Warning: pygmo hypervolume failed, using approximation: {e}")
             return -_approx_hypervolume(pts_2d, ref_point)
             
     except ImportError:
-        # Fallback without pygmo
+        
         return _approx_hypervolume(points, ref_point)
     except Exception as e:
         print(f"Warning: Hypervolume computation failed: {e}")
@@ -67,7 +67,7 @@ def _approx_hypervolume(points, ref_point=None):
             
         pts_2d = pts[:, :2]
         
-        # Remove invalid points
+      
         valid_mask = ~(np.any(np.isnan(pts_2d), axis=1) | np.any(np.isinf(pts_2d), axis=1))
         pts_2d = pts_2d[valid_mask]
         
@@ -77,8 +77,7 @@ def _approx_hypervolume(points, ref_point=None):
         if ref_point is None:
             ref_point = np.max(pts_2d, axis=0) * 1.2
             
-        # Simple hypervolume approximation
-        # Sort by first objective
+      
         sorted_pts = pts_2d[np.argsort(pts_2d[:, 0])]
         
         hv = 0.0
@@ -118,7 +117,7 @@ def save_solutions(solutions, filename="solutions_backup.json", metadata=None):
                 "feasible": bool(sol["feasible"])
             }
             
-            # Add optional fields
+           
             if "constraint_info" in sol:
                 block["constraint_info"] = sol["constraint_info"]
             if "crowding_distance" in sol:
@@ -174,7 +173,7 @@ def load_solutions(filename="solutions_backup.json", verbose=True):
                 "feasible": bool(s["feasible"])
             }
             
-            # Load optional fields
+           
             if "constraint_info" in s:
                 entry["constraint_info"] = s["constraint_info"]
             if "crowding_distance" in s:
@@ -212,7 +211,7 @@ def print_solution_summary(x, udp_instance=None):
         return
 
     try:
-        # Unpack parameters
+        
         (
             a1, e1, i1, w1, eta1,
             a2, e2, i2, w2, eta2,
@@ -220,12 +219,12 @@ def print_solution_summary(x, udp_instance=None):
             r1, r2, r3, r4
         ) = x
         
-        # Convert to integers for display
+       
         S1_int, P1_int, F1_int = int(S1), int(P1), int(F1)
         S2_int, P2_int, F2_int = int(S2), int(P2), int(F2)
         
-        # Calculate derived values
-        alt1 = a1 - 6371  # Approximate altitude
+       
+        alt1 = a1 - 6371  
         alt2 = a2 - 6371
         total_sats = S1_int * P1_int + S2_int * P2_int
 
@@ -265,17 +264,17 @@ def print_solution_summary(x, udp_instance=None):
     print(f"  Rover 3: index {int(r3)}")
     print(f"  Rover 4: index {int(r4)}")
 
-    # Analyze with UDP if provided
+   
     if udp_instance:
         try:
-            # Get fitness
+
             fitness = udp_instance.fitness(x)
             
             print("\n🎯 FITNESS VALUES:")
             print(f"  J1 (Communication cost): {fitness[0]:.6f}")
             print(f"  J2 (Infrastructure cost): {fitness[1]:.6f}")
             
-            # Get detailed analysis
+            
             if hasattr(udp_instance, 'analyze_solution'):
                 analysis = udp_instance.analyze_solution(x)
                 
@@ -290,7 +289,7 @@ def print_solution_summary(x, udp_instance=None):
                 
                 print(f"\n✓ FEASIBLE: {not (analysis['constraints']['rover_violated'] or analysis['constraints']['sat_violated'])}")
                 
-                # Show penalty impact
+                
                 if 'fitness' in analysis and 'without_penalty' in analysis['fitness']:
                     f_no_penalty = analysis['fitness']['without_penalty']
                     penalty_effect = fitness[0] - f_no_penalty[0]
@@ -324,14 +323,14 @@ def validate_solution(x, udp_instance=None):
         "info": []
     }
 
-    # Basic length check
+   
     if len(x) != 20:
         v["errors"].append(f"Expected 20 parameters, got {len(x)}")
         v["valid"] = False
         return v
 
     try:
-        # Unpack parameters
+        
         (
             a1, e1, i1, w1, eta1,
             a2, e2, i2, w2, eta2,
@@ -339,7 +338,7 @@ def validate_solution(x, udp_instance=None):
             r1, r2, r3, r4
         ) = x
         
-        # Check basic ranges
+       
         bounds_check = [
             ("a1", a1, 6871, 22371),
             ("a2", a2, 6871, 22371),
@@ -355,7 +354,7 @@ def validate_solution(x, udp_instance=None):
             if val < low or val > high:
                 v["warnings"].append(f"{name} = {val:.2f} outside typical range [{low}, {high}]")
         
-        # Check integer parameters
+        
         int_params = [
             ("S1", S1, 1, 20),
             ("P1", P1, 1, 20),
@@ -371,12 +370,12 @@ def validate_solution(x, udp_instance=None):
             elif val < low or val > high:
                 v["warnings"].append(f"{name} = {int(val)} outside typical range [{low}, {high}]")
         
-        # Check rover indices
+        
         for i, idx in enumerate([r1, r2, r3, r4], 1):
             if not float(idx).is_integer():
                 v["warnings"].append(f"Rover {i} index should be integer (got {idx})")
         
-        # Get bounds from UDP if available
+        
         if udp_instance:
             try:
                 bounds = udp_instance.get_bounds()
@@ -387,18 +386,18 @@ def validate_solution(x, udp_instance=None):
                         v["errors"].append(f"Parameter {i+1} = {val:.4f} outside bounds [{low:.2f}, {high:.2f}]")
                         v["valid"] = False
                 
-                # Calculate fitness
+               
                 try:
                     fitness = udp_instance.fitness(x)
                     v["fitness"] = fitness
                     v["info"].append(f"Fitness: J1={fitness[0]:.6f}, J2={fitness[1]:.6f}")
                     
-                    # Detailed analysis if available
+                   
                     if hasattr(udp_instance, 'analyze_solution'):
                         analysis = udp_instance.analyze_solution(x)
                         v["analysis"] = analysis
                         
-                        # Check constraints
+                      
                         rover_violated = analysis['constraints']['rover_violated']
                         sat_violated = analysis['constraints']['sat_violated']
                         v["feasible"] = not (rover_violated or sat_violated)
@@ -415,7 +414,7 @@ def validate_solution(x, udp_instance=None):
             except Exception as e:
                 v["warnings"].append(f"Could not validate with UDP: {e}")
         
-        # Add parameter count info
+        
         v["info"].append(f"Total satellites: {int(S1)*int(P1) + int(S2)*int(P2)}")
         
     except Exception as e:
@@ -479,7 +478,7 @@ def check_dependencies(verbose=True):
         "sgp4": ("Satellite propagation", True),
         "networkx": ("Graph algorithms", True),
         "pykep": ("Astrodynamics", True),
-        "pygmo": ("Optimization library", False),  # Non-critical for basic operation
+        "pygmo": ("Optimization library", False),  
         "matplotlib": ("Plotting", False),
         "pandas": ("Data analysis", False),
     }
@@ -518,7 +517,7 @@ def check_dependencies(verbose=True):
 
         print("="*60)
 
-    # Check critical modules
+   
     critical_ok = all(ok for mod, (ok, critical, _, _) in status.items() if critical)
     all_ok = all(ok for mod, (ok, _, _, _) in status.items())
 
@@ -540,13 +539,13 @@ def run_quick_test():
     """
     print("Running quick test of utilities...")
     
-    # Test 1: Dependency check
+   
     print("\n1. Checking dependencies:")
     all_ok, critical_ok, status = check_dependencies(verbose=False)
     print(f"   Critical modules OK: {critical_ok}")
     print(f"   All modules OK: {all_ok}")
     
-    # Test 2: Create a dummy solution
+    
     print("\n2. Testing solution validation:")
     dummy_solution = [7000, 0.001, 1.2, 0, 40,
                       8200, 0.001, 1.2, 0, 30,
@@ -561,7 +560,7 @@ def run_quick_test():
     if validation['errors']:
         print(f"   Errors: {len(validation['errors'])}")
     
-    # Test 3: Hypervolume calculation
+   
     print("\n3. Testing hypervolume calculation:")
     dummy_points = np.array([[0.5, 0.6], [0.4, 0.7], [0.6, 0.5]])
     hv_score = compute_hypervolume_score(dummy_points)
@@ -580,26 +579,26 @@ def run_quick_test():
 if __name__ == "__main__":
    print("Testing utility functions...\n")
   
-   # Check dependencies
+  
    check_dependencies()
   
-   # Create a dummy solution for testing
+   
    dummy_solution = [
-       7000, 0.001, 1.2, 0, 55,  # Walker 1
-       8000, 0.001, 1.2, 0, 15,  # Walker 2
-       10, 2, 1,  # S1, P1, F1
-       10, 2, 1,  # S2, P2, F2
-       13, 21, 34, 55  # Rover indices
+       7000, 0.001, 1.2, 0, 55, 
+       8000, 0.001, 1.2, 0, 15, 
+       10, 2, 1,  
+       10, 2, 1,  
+       13, 21, 34, 55 
    ]
   
-   # Print solution summary
+   
    print_solution_summary(dummy_solution)
   
-   # Validate solution
+   
    validation = validate_solution(dummy_solution)
    print_validation_results(validation)
   
-   # Test hypervolume calculation
+
    test_points = [
        [0.5, 0.3],
        [0.6, 0.2],

@@ -11,10 +11,10 @@ import time
 import json
 import numpy as np
 
-# Add current directory to Python path
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-# Try imports
+
 try:
     from optimizer import QuantumCommunicationsOptimizer
     from utils import print_solution_summary
@@ -51,30 +51,23 @@ def print_top_solutions_detailed(solutions, show_top=10):
     print(f"\n📊 TOP {min(show_top, len(solutions))} SOLUTIONS ANALYSIS")
     print("="*60)
     
-    # Kategorizo zgjidhjet
-    #feasible_solutions = [s for s in solutions if s.get("feasible", False)]
+
     pareto_solutions = [s for s in solutions if s.get("pareto_optimal", False)]
     
     print(f"Total Solutions: {len(solutions)}")
     print(f"Pareto-Optimal: {len(pareto_solutions)}")
-    #print(f"Feasible: {len(feasible_solutions)}")
-    #print(f"Infeasible: {len(solutions) - len(feasible_solutions)}")
-    
-    # Rendit sipas J1 (Communication Cost)
+
     sorted_solutions = sorted(solutions, key=lambda s: s["fitness"][0])
     
-    # Shfaq top solutions
+
     for i, sol in enumerate(sorted_solutions[:show_top]):
         print(f"\n{'='*40}")
         print(f"SOLUTION #{i+1}")
         print(f"{'='*40}")
         
-        # Status indicators
+
         status = []
-        #if sol.get("feasible", False):
-         #   status.append("✅ FEASIBLE")
-        #else:
-         #   status.append("❌ INFEASIBLE")
+
         
         if sol.get("pareto_optimal", False):
             status.append("⭐ PARETO-OPTIMAL")
@@ -82,13 +75,13 @@ def print_top_solutions_detailed(solutions, show_top=10):
         print(f"Status: {' | '.join(status)}")
         print(f"Crowding Distance: {sol.get('crowding_distance', 0):.6f}")
         
-        # Fitness values
+
         fitness = sol["fitness"]
         print(f"\n📈 FITNESS VALUES:")
         print(f"  J1 (Communication Cost): {fitness[0]:.6f}")
         print(f"  J2 (Infrastructure Cost): {fitness[1]:.6f}")
         
-        # Constraint information
+
         if "constraint_info" in sol and sol["constraint_info"]:
             info = sol["constraint_info"]
             print(f"\n📏 CONSTRAINT ANALYSIS:")
@@ -105,7 +98,7 @@ def print_top_solutions_detailed(solutions, show_top=10):
                 sat_status = "✅" if not sat_violated else "❌"
                 print(f"  {sat_status} Satellite Distance: {sat_dist:.2f} km")
         
-        # Decision variables (first 5 values for brevity)
+
         if "x" in sol and sol["x"] is not None:
             x_values = sol["x"]
             if hasattr(x_values, 'tolist'):
@@ -118,7 +111,7 @@ def print_top_solutions_detailed(solutions, show_top=10):
             if len(x_values) > 5:
                 print(f"  ... and {len(x_values) - 5} more variables")
         
-        # Additional metrics
+
         if "additional_metrics" in sol:
             metrics = sol["additional_metrics"]
             print(f"\n📊 ADDITIONAL METRICS:")
@@ -137,7 +130,7 @@ def save_submission_from_optimizer(optimizer, solutions, filename="submission_fi
     """
     decision_vectors = []
 
-    # RASTI 1: solutions është listë dictionaries me "x"
+
     if isinstance(solutions, list):
         for sol in solutions:
             if isinstance(sol, dict) and "x" in sol and sol["x"] is not None:
@@ -146,7 +139,7 @@ def save_submission_from_optimizer(optimizer, solutions, filename="submission_fi
                     x = x.tolist()
                 decision_vectors.append(x)
 
-    # RASTI 2: optimizer ka atribut population si listë
+
     if not decision_vectors and hasattr(optimizer, "population"):
         pop = optimizer.population
         if isinstance(pop, list):
@@ -182,7 +175,7 @@ def run_full_optimization():
     print("                 FULL OPTIMIZATION")
     print("="*60)
 
-    # Get parameters with defaults
+
     print("\nEnter optimization parameters:")
     try:
         pop = int(input("Population size [50]: ") or 50)
@@ -207,7 +200,7 @@ def run_full_optimization():
             random_seed=seed
         )
 
-        # Run optimization
+
         sols = optimizer.optimize(verbose=True)
 
         if not sols:
@@ -218,7 +211,7 @@ def run_full_optimization():
         print(f"\n✅ Optimization completed in {elapsed:.2f} seconds")
         print(f"   Found {len(sols)} Pareto-optimal solutions\n")
 
-        # ✅ SHFAQ VETËM TOP 10 SOLUTIONS
+
         optimizer.analyze_solutions(show_top=10)
 
         save_submission_from_optimizer(
@@ -267,20 +260,20 @@ def run_quick_test():
     print("Testing basic functionality...\n")
 
     try:
-        # Test 1: UDP
+
         print("1. Testing constellation_udp...")
         udp = constellation_udp()
 
         print("   ✅ constellation_udp loaded")
 
-        # Test 2: Example
+ 
         print("\n2. Testing example solution...")
         x = udp.example()
         fitness = udp.fitness(x)
 
         print(f"   ✅ Example fitness: {fitness}")
 
-        # Test 3: Optimizer
+
         print("\n3. Testing optimizer...")
 
         optimizer = QuantumCommunicationsOptimizer(
@@ -291,14 +284,14 @@ def run_quick_test():
 
         print("   ✅ Optimizer created")
         
-        # Run quick optimization
+
         print("\n4. Running quick optimization...")
         solutions = optimizer.optimize(verbose=False)
         
         if solutions:
             print(f"   ✅ Found {len(solutions)} solutions")
             
-            # Show top 3 solutions
+
             print("\n5. Showing top 3 solutions:")
             print_top_solutions_detailed(solutions, show_top=3)
         else:
@@ -347,7 +340,7 @@ def main_menu():
         else:
             print("❌ Invalid option. Please choose 1-5.")
         
-        # Pause between operations
+
         if choice in ["1", "3", "4"]:
             input("\nPress Enter to continue...")
 

@@ -297,26 +297,25 @@ class constellation_udp:
     # FITNESS FUNCTION (MODIFIED WITH PENALTY METHOD)
     ###############################################################
     def fitness(self, x):
-        # Extract parameters
+
         a1, e1, i1, w1, eta1, a2, e2, i2, w2, eta2, S1, P1, F1, S2, P2, F2, *rv_idx = x
 
-        # Convert to integers
+
         S1, P1, S2, P2 = int(S1), int(P1), int(S2), int(P2)
         N1 = S1 * P1
         N2 = S2 * P2
 
-        # Get rover positions
+
         idx = [int(r) % len(self.lambdas) for r in rv_idx[:4]]
         lamb = self.lambdas[idx]
         phi = self.phis[idx]
         rv = self.rover_positions(lamb, phi)
 
-        # Construct constellations
+
+
         w1s, w2s = self.construct_walkers(x)
 
-        # ============================================================
-        # ✅ OBJECTIVE J1 — REAL COMMUNICATION COST (FIXED)
-        # ============================================================
+
         pos = self.construct_pos(w1s, w2s, rv)
 
         total_link_cost = 0.0
@@ -334,20 +333,22 @@ class constellation_udp:
         if total_links > 0:
             f1 = total_link_cost / total_links
         else:
-            f1 = 1e4  # Penalitet nëse s'ka lidhje fare
+            f1 = 1e4  
 
-        # ============================================================
-        # ✅ OBJECTIVE J2 — INFRASTRUCTURE COST (UNCHANGED)
-        # ============================================================
+
+
+
+
+
+
+
         f2 = eta1 * N1 + eta2 * N2
 
-        # ✅ STABLE NORMALIZATION
+
         f1_normalized = f1 / 1000.0
         f2_normalized = f2 / 100000.0
 
-        # ============================================================
-        # ✅ PENALTY METHOD (UNCHANGED)
-        # ============================================================
+
         penalty = 0.0
 
         rover_distance = self._calculate_rover_distance(lamb, phi)
@@ -363,12 +364,10 @@ class constellation_udp:
         return [f1_normalized + penalty, f2_normalized + penalty]
 
 
-    ###############################################################
-    # UTILITY METHODS FOR DEBUGGING AND ANALYSIS
-    ###############################################################
+
     def analyze_solution(self, x):
             """Analyze a solution and return detailed information."""
-            # Extract parameters
+ 
             a1, e1, i1, w1, eta1, a2, e2, i2, w2, eta2, S1, P1, F1, S2, P2, F2, *rv_idx = x
             
             S1, P1, S2, P2 = int(S1), int(P1), int(S2), int(P2)
@@ -376,18 +375,18 @@ class constellation_udp:
             lamb = self.lambdas[idx]
             phi = self.phis[idx]
             
-            # Construct constellations
+
             w1s, w2s = self.construct_walkers(x)
             
-            # Calculate distances
+
             rover_distance = self._calculate_rover_distance(lamb, phi)
             sat_distance = self._calculate_satellite_distance(w1s, w2s)
             
-            # Check constraint violations
+        
             rover_violated = rover_distance < self.min_rover_dist
             sat_violated = sat_distance < self.min_sat_dist
             
-            # Calculate fitness without penalty (for comparison)
+            
             fitness_without_penalty = self._fitness_without_penalty(x)
             
             return {
@@ -456,11 +455,11 @@ class constellation_udp:
     ###############################################################
     def example(self):
             return [
-                7000, 0.001, 1.2, 0, 40,      # Walker 1: a, e, i, w, eta
-                8200, 0.001, 1.2, 0, 30,      # Walker 2: a, e, i, w, eta
-                10, 2, 1,                     # S1, P1, F1
-                8, 3, 1,                      # S2, P2, F2
-                5, 10, 15, 20                 # Rover indices
+                7000, 0.001, 1.2, 0, 40,      
+                8200, 0.001, 1.2, 0, 30,      
+                10, 2, 1,                     
+                8, 3, 1,                      
+                5, 10, 15, 20                 
             ]
 
 
@@ -476,16 +475,16 @@ class constellation_udp:
             rv = self.rover_positions(self.lambdas[rid], self.phis[rid])
             pos = self.construct_pos(w1, w2, rv)
 
-            # Plot satellites
+           
             ax.scatter(pos[:, ep, 0], pos[:, ep, 1], pos[:, ep, 2], s=20, c='red', label='Satellites')
             
-            # Plot motherships (last 3 positions)
+            
             ax.scatter(pos[-3:, ep, 0], pos[-3:, ep, 1], pos[-3:, ep, 2], s=50, c='blue', marker='^', label='Motherships')
             
-            # Plot rovers (last 4 positions before motherships)
+           
             ax.scatter(pos[-7:-3, ep, 0], pos[-7:-3, ep, 1], pos[-7:-3, ep, 2], s=100, c='green', marker='s', label='Rovers')
 
-            # Plot Earth
+            
             r = self.Rp
             u, v = np.mgrid[0:2*np.pi:20j, 0:np.pi:10j]
             ax.plot_surface(r * np.cos(u) * np.sin(v),
@@ -499,7 +498,7 @@ class constellation_udp:
             ax.set_title(f'Constellation Configuration (Epoch {ep})')
             ax.legend()
             
-            # Set equal aspect ratio
+            
             max_range = np.array([pos[:, ep, 0].max()-pos[:, ep, 0].min(),
                                 pos[:, ep, 1].max()-pos[:, ep, 1].min(),
                                 pos[:, ep, 2].max()-pos[:, ep, 2].min()]).max()
