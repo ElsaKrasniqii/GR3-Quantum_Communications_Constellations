@@ -125,6 +125,55 @@ def print_top_solutions_detailed(solutions, show_top=10):
             for key, value in metrics.items():
                 print(f"  {key}: {value}")
 
+
+# ==========================================================
+# SAVE SUBMISSION FILE (ROBUST VERSION)
+# ==========================================================
+def save_submission_from_optimizer(optimizer, solutions, filename="submission_file.json"):
+    """
+    Ruan submission JSON duke nxjerrë decision vectors
+    nga struktura reale e zgjidhjeve.
+    Funksionon edhe nëse s'ka get_x().
+    """
+    decision_vectors = []
+
+    # RASTI 1: solutions është listë dictionaries me "x"
+    if isinstance(solutions, list):
+        for sol in solutions:
+            if isinstance(sol, dict) and "x" in sol and sol["x"] is not None:
+                x = sol["x"]
+                if hasattr(x, "tolist"):
+                    x = x.tolist()
+                decision_vectors.append(x)
+
+    # RASTI 2: optimizer ka atribut population si listë
+    if not decision_vectors and hasattr(optimizer, "population"):
+        pop = optimizer.population
+        if isinstance(pop, list):
+            for item in pop:
+                if isinstance(item, dict) and "x" in item:
+                    x = item["x"]
+                    if hasattr(x, "tolist"):
+                        x = x.tolist()
+                    decision_vectors.append(x)
+
+    if not decision_vectors:
+        print("❌ Nuk u gjet asnjë decision vector (x). Submission NUK u krijua.")
+        return
+
+    submission = {
+        "challenge": "spoc-2-quantum-communications-constellations",
+        "problem": "quantum-communications-constellations",
+        "decisionVector": decision_vectors
+    }
+
+    with open(filename, "w") as f:
+        json.dump(submission, f, indent=2)
+
+    print(f"\n📁 Submission file u ruajt me sukses: {filename}")
+    print(f"📊 Numri i decision vectors: {len(decision_vectors)}")
+
+
 # ==========================================================
 # FULL OPTIMIZATION
 # ==========================================================
@@ -171,6 +220,12 @@ def run_full_optimization():
 
         # ✅ SHFAQ VETËM TOP 10 SOLUTIONS
         optimizer.analyze_solutions(show_top=10)
+
+        save_submission_from_optimizer(
+        optimizer,
+        sols,
+        filename="submission_file.json"
+        )
 
         print("\n🎉 OPTIMIZATION FINISHED SUCCESSFULLY!")
 
